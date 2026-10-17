@@ -22,6 +22,7 @@ function Level1.keypressed(key)
 end
 
 function Level1.draw()
+    love.graphics.setColor(0, 0, 0)
     love.graphics.print("Level 1: Teenage girl", 20, 20)
     love.graphics.print("[ENTER] — next level", 20, 40)
     love.graphics.print("[BACKSPACE] — menu", 20, 60)

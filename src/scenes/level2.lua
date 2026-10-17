@@ -21,6 +21,7 @@ function Level2.keypressed(key)
 end
 
 function Level2.draw()
+    love.graphics.setColor(0, 0, 0)
     love.graphics.print("Level 2: Office worker", 20, 20)
     love.graphics.print("[ENTER] — previous level", 20, 40)
     love.graphics.print("[BACKSPACE] — menu", 20, 60)
