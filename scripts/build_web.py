@@ -89,7 +89,7 @@ def update_index_html(web_dir: Path, build_ts: int):
     index_html_path = web_dir / "index.html"
     
     html_content = f"""<!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
@@ -97,8 +97,9 @@ def update_index_html(web_dir: Path, build_ts: int):
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, minimum-scale=1, maximum-scale=1">
-    <title>Banned from Cookie Realm</title>
+    <title>tech_plague</title>
 
+    <script src="coi-serviceworker.js"></script>
     <script type="text/javascript">
       var BUILD_TS = {build_ts};
       var tsLink = document.createElement('link');
@@ -110,7 +111,7 @@ def update_index_html(web_dir: Path, build_ts: int):
   </head>
   <body>
     <div id="game-container">
-      <canvas id="loadingCanvas" oncontextmenu="event.preventDefault()" width="1275" height="825"></canvas>
+      <canvas id="loadingCanvas" oncontextmenu="event.preventDefault()" width="1280" height="720"></canvas>
       <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
     </div>
 
@@ -138,7 +139,7 @@ def update_index_html(web_dir: Path, build_ts: int):
 
         loadingContext.font = '22px sans-serif';
         loadingContext.fillStyle = "rgb(255, 255, 255)";
-        loadingContext.fillText("Banned from Cookie Realm", canvas.width / 2, canvas.height / 4);
+        loadingContext.fillText("tech_plague", canvas.width / 2, canvas.height / 4);
         loadingContext.fillText("Powered by Love2D WebAssembly", canvas.width / 2, (canvas.height / 4) * 3);
       }}
 
@@ -146,7 +147,6 @@ def update_index_html(web_dir: Path, build_ts: int):
       window.onclick = function () {{ window.focus(); }};
 
       window.addEventListener("keydown", function(e) {{
-        // space and arrow keys
         if([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) {{
           e.preventDefault();
         }}
@@ -182,12 +182,12 @@ def update_index_html(web_dir: Path, build_ts: int):
         monitorRunDependencies: function(left) {{
           this.remainingDependencies = left;
           this.totalDependencies = Math.max(this.totalDependencies, left);
-          Module.setStatus(left ? 'Загрузка... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'Все ресурсы загружены.');
+          Module.setStatus(left ? 'Loading... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'All assets loaded.');
         }}
       }};
-      Module.setStatus('Загрузка ресурсов...');
+      Module.setStatus('Loading assets...');
       window.onerror = function(event) {{
-        Module.setStatus('Ошибка загрузки. См. консоль браузера.');
+        Module.setStatus('Loading error. See browser console.');
         Module.setStatus = function(text) {{
           if (text) Module.printErr('[post-exception status] ' + text);
         }};
@@ -197,7 +197,6 @@ def update_index_html(web_dir: Path, build_ts: int):
         Love(Module);
       }};
 
-      // Динамическая загрузка скриптов с параметром ts против кеша
       (function() {{
         var s1 = document.createElement('script');
         s1.type = 'text/javascript';
@@ -267,7 +266,7 @@ def serve_directory(directory: Path, port: int = 8080):
 
 def main():
     parser = argparse.ArgumentParser(description="Сборка веб-версии Love2D с защитой от кеширования (?ts=).")
-    parser.add_argument("--serve", action="store_true", help="Запустить локальный тестовый HTTP-сервер после сборки")
+    parser.add_argument("--serve", "--server", action="store_true", dest="serve", help="Запустить локальный тестовый HTTP-сервер после сборки")
     parser.add_argument("--port", type=int, default=8080, help="Порт для локального сервера (по умолчанию 8080)")
     args = parser.parse_args()
 
@@ -278,14 +277,14 @@ def main():
     build_ts = int(time.time() * 1000)
     package_uuid = str(uuid.uuid4())
     
-    # 1. Сборка game.data и bfck.love
+    # 1. Сборка game.data и tech_plague.love
     game_data_path = web_dir / "game.data"
-    bfck_love_path = root_dir / "bfck.love"
+    tech_plague_love_path = root_dir / "tech_plague.love"
     
     file_size = build_love_archive(root_dir, game_data_path)
-    # Копируем также в корень как bfck.love
+    # Копируем также в корень как tech_plague.love
     import shutil
-    shutil.copy2(game_data_path, bfck_love_path)
+    shutil.copy2(game_data_path, tech_plague_love_path)
     
     # 2. Обновление game.js
     update_game_js(web_dir, file_size, package_uuid)

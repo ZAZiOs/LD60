@@ -1,6 +1,6 @@
 function love.conf(t)
     t.identity = "tech_plague"
-    t.version = "11.5"
+    t.version = "11.4"
 
     t.window.title = "tech_plague"
     t.window.width = 1280
