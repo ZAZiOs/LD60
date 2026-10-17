@@ -5,7 +5,7 @@ local I18n = {
     default_locale = "en",
     dictionaries = {},
 
-    active_family = "lato",
+    active_family = "tahoma",
     registered_families = {},
     family_aliases = {},
     registered_fonts = {},
@@ -509,51 +509,8 @@ function I18n.init()
         }
     })
 
-    I18n.registerFamily("lato", {
-        name = "Lato",
-        filter = "linear",
-        hinting = "normal",
-        line_height = 1.0,
-        aliases = { "lato", "Lato" },
-        fallback_family = "cairopixel",
-        is_default = true,
-        variants = {
-            thin                 = "assets/fonts/Lato/Lato-Thin.ttf",
-            thin_italic          = "assets/fonts/Lato/Lato-ThinItalic.ttf",
-            extralight           = "assets/fonts/Lato/Lato-ExtraLight.ttf",
-            extralight_italic    = "assets/fonts/Lato/Lato-ExtraLightItalic.ttf",
-            light                = "assets/fonts/Lato/Lato-Light.ttf",
-            light_italic         = "assets/fonts/Lato/Lato-LightItalic.ttf",
-            regular              = "assets/fonts/Lato/Lato-Regular.ttf",
-            italic               = "assets/fonts/Lato/Lato-Italic.ttf",
-            medium               = "assets/fonts/Lato/Lato-Medium.ttf",
-            medium_italic        = "assets/fonts/Lato/Lato-MediumItalic.ttf",
-            semibold             = "assets/fonts/Lato/Lato-SemiBold.ttf",
-            semibold_italic      = "assets/fonts/Lato/Lato-SemiBoldItalic.ttf",
-            bold                 = "assets/fonts/Lato/Lato-Bold.ttf",
-            bold_italic          = "assets/fonts/Lato/Lato-BoldItalic.ttf",
-            extrabold            = "assets/fonts/Lato/Lato-ExtraBold.ttf",
-            extrabold_italic     = "assets/fonts/Lato/Lato-ExtraBoldItalic.ttf",
-            black                = "assets/fonts/Lato/Lato-Black.ttf",
-            black_italic         = "assets/fonts/Lato/Lato-BlackItalic.ttf"
-        },
-        sizes = {
-            tiny     = 16,
-            small    = 20,
-            medium   = 26,
-            dialog   = 32,
-            dialogue = 32,
-            large    = 36,
-            subtitle = 44,
-            title    = 56,
-            header   = 56,
-            huge     = 68
-        }
-    })
-
     I18n.registerFamily("tahoma", {
         name = "Tahoma",
-        filter = "nearest",
         hinting = "mono",
         line_height = 1.0,
         aliases = { "tahoma", "Tahoma" },

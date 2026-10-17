@@ -423,6 +423,7 @@ function PixelWindow:_renderCanvas()
     love.graphics.push("all")
     love.graphics.setCanvas(self.canvas)
     love.graphics.origin()
+    love.graphics.setScissor()
     love.graphics.clear(0, 0, 0, 0)
 
     love.graphics.push()

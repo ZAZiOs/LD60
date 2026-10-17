@@ -39,23 +39,43 @@ function Settings.init()
     Settings.applyAll()
 end
 
-function Settings.applyAll()
+function Settings.applyWindow()
+    if not (love.window and love.window.isOpen()) then return end
+    local cur_fs = love.window.getFullscreen()
+    if cur_fs ~= Settings.data.fullscreen then
+        if Settings.data.fullscreen then
+            love.window.setFullscreen(true, "desktop")
+        else
+            love.window.setFullscreen(false)
+            love.window.setMode(1280, 720, {
+                resizable = true,
+                minwidth = 1280,
+                minheight = 720,
+                highdpi = true,
+                usedpiscale = false
+            })
+        end
+    end
+    if love.window.setVSync then
+        love.window.setVSync(Settings.data.vsync and 1 or 0)
+    end
+    local ok, Viewport = pcall(require, "src.core.viewport")
+    if ok and Viewport then
+        Viewport.resize(love.graphics.getWidth(), love.graphics.getHeight())
+    end
+    local ok2, SceneManager = pcall(require, "src.core.scene_manager")
+    if ok2 and SceneManager then
+        SceneManager.resize(love.graphics.getWidth(), love.graphics.getHeight())
+    end
+end
 
+function Settings.applyAll()
     if Settings.data.locale then
         I18n.setLocale(Settings.data.locale)
     end
 
     Settings.applyAudio()
-
-    if love.window and love.window.isOpen() then
-        local cur_fs = love.window.getFullscreen()
-        if cur_fs ~= Settings.data.fullscreen then
-            love.window.setFullscreen(Settings.data.fullscreen, "desktop")
-        end
-        if love.window.setVSync then
-            love.window.setVSync(Settings.data.vsync and 1 or 0)
-        end
-    end
+    Settings.applyWindow()
 end
 
 function Settings.applyAudio()
@@ -89,9 +109,7 @@ function Settings.set(key, value)
     elseif key == "master_volume" or key == "music_volume" or key == "sfx_volume" or key == "muted" then
         Settings.applyAudio()
     elseif key == "fullscreen" then
-        if love.window and love.window.isOpen() then
-            love.window.setFullscreen(value, "desktop")
-        end
+        Settings.applyWindow()
     elseif key == "vsync" then
         if love.window and love.window.setVSync then
             love.window.setVSync(value and 1 or 0)

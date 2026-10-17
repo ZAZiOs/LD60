@@ -38,6 +38,11 @@ function love.resize(w, h)
 end
 
 function love.keypressed(key, scancode, isrepeat)
+    if key == "f11" or (key == "return" and (love.keyboard.isDown("lalt") or love.keyboard.isDown("ralt"))) then
+        local cur = Settings.get("fullscreen") or false
+        Settings.set("fullscreen", not cur)
+        return
+    end
     if key == "escape" and SceneManager.getCurrentName() == "menu" then
         love.event.quit()
         return
