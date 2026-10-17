@@ -3,6 +3,7 @@ local PixelScreen = require("src.core.pixel_screen")
 local GameScene = require("src.core.game_scene")
 local PixelSceneBuilder = require("src.core.pixel_scene_builder")
 local AudioManager = require("src.core.audio_manager")
+local Effects = require("src.core.effects")
 
 local desktop = PixelSceneBuilder.new("desktop")
     :background("assets/level1/desktop/wp.png")
@@ -187,6 +188,9 @@ local screen = PixelScreen.new({
 local Level1Scene = GameScene.new({
     bg = "assets/bg/intro_bg.png",
     screen = screen,
+    screen_draw_fn = function(s)
+        Effects.drawCrt(s.canvas, s.x, s.y, s.scale_x, s.scale_y)
+    end,
     enter = function(self)
         AudioManager.musFadeTo("cat", 0.8, 0.5)
     end,

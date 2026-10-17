@@ -9,6 +9,7 @@ function GameScene.new(opts)
     if opts and opts.__index == PixelScreen then
         self.screen = opts
         self.bg_path = "assets/bg/intro_bg.png"
+        self.screen_draw_fn = nil
     else
         opts = opts or {}
         self.bg_path = opts.bg or "assets/bg/intro_bg.png"
@@ -18,6 +19,7 @@ function GameScene.new(opts)
         self.on_enter = opts.on_enter or opts.enter
         self.on_leave = opts.on_leave or opts.leave
         self.draw_overlay = opts.draw_overlay
+        self.screen_draw_fn = opts.screen_draw_fn
     end
 
     self.bg_image = nil
@@ -79,7 +81,12 @@ function GameScene:draw()
 
     if self.screen then
         self.screen:render()
-        self.screen:draw()
+
+        if self.screen_draw_fn then
+            self.screen_draw_fn(self.screen)
+        else
+            self.screen:draw()
+        end
     end
 
     if self.draw_overlay then

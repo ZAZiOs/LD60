@@ -3,6 +3,7 @@ local Viewport = require("src.core.viewport")
 local AudioManager = require("src.core.audio_manager")
 local Settings = require("src.core.settings")
 local I18n = require("src.core.i18n")
+local Effects = require("src.core.effects")
 
 function love.load()
     love.window.setTitle("tech_plague")
@@ -13,6 +14,7 @@ function love.load()
     I18n.init()
 
     AudioManager.init()
+    Effects.load()
 
     SceneManager.register("menu", "src.scenes.menu")
     SceneManager.register("level1", "src.scenes.level1")
@@ -23,6 +25,7 @@ end
 
 function love.update(dt)
     AudioManager.update(dt)
+    Effects.update(dt)
     SceneManager.update(dt)
 end
 
