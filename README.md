@@ -47,6 +47,10 @@ Uses **makelove** for **win64** and **lovejs** targets.
 
     Output goes to `bin/` (git-ignored).
 
+## Documentation
+
+- [Core Library Documentation (docs/CORE.md)](docs/CORE.md) — подробное руководство по всем модулям ядра (`src/core/`): сцены, вьюпорт, звук, анимации, локализация, шрифты, шина событий.
+
 ## Project Structure
 
 ```text
@@ -54,8 +58,14 @@ Uses **makelove** for **win64** and **lovejs** targets.
 ├── main.lua              # Entry point
 ├── conf.lua              # LÖVE config
 ├── src/                  # Game source
-├── assets/               # Sprites, sounds, etc.
+│   ├── core/             # Framework modules (see docs/CORE.md)
+│   ├── scenes/           # Game scenes
+│   ├── locales/          # Translations (ru.json, en.json)
+│   └── lib/              # Third-party utilities (json, etc.)
+├── docs/                 # Project documentation
+├── assets/               # Sprites, fonts, audio
 ├── .vscode/              # Editor tasks
 ├── make_all.toml.example # Local build template
 └── bin/                  # Build output (ignored)
 ```
+

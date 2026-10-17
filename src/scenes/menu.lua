@@ -1,43 +1,52 @@
-local SceneManager = require("src.scene_manager")
-local Menu = {}
+local SceneManager = require("src.core.scene_manager")
+local I18n = require("src.core.i18n")
 
-function Menu.enter()
+local Menu = {
+    selected = 1,
+    options = {}
+}
+
+function Menu:enter()
     print("Entered Menu")
-    Menu.selected = 1
-    Menu.options = { "Start Game", "Quit" }
+    self.selected = 1
+    self.options = {
+        I18n.t("game.start") ~= "game.start" and I18n.t("game.start") or "Start Game",
+        I18n.t("game.quit") ~= "game.quit" and I18n.t("game.quit") or "Quit"
+    }
 end
 
-function Menu.leave()
+function Menu:leave()
     print("Leaving Menu")
 end
 
-function Menu.update(dt)
-    -- Menu logic (animated background, etc.) goes here
+function Menu:update(dt)
+
 end
 
-function Menu.keypressed(key)
+function Menu:keypressed(key)
     if key == "up" then
-        Menu.selected = Menu.selected - 1
-        if Menu.selected < 1 then Menu.selected = #Menu.options end
+        self.selected = self.selected - 1
+        if self.selected < 1 then self.selected = #self.options end
     elseif key == "down" then
-        Menu.selected = Menu.selected + 1
-        if Menu.selected > #Menu.options then Menu.selected = 1 end
+        self.selected = self.selected + 1
+        if self.selected > #self.options then self.selected = 1 end
     elseif key == "return" then
-        if Menu.selected == 1 then
-            SceneManager.switch("level1")
-        elseif Menu.selected == 2 then
+        if self.selected == 1 then
+            SceneManager.fadeTo("level1", 0.5)
+        elseif self.selected == 2 then
             love.event.quit()
         end
     end
 end
 
-function Menu.draw()
-    love.graphics.print("tech_plague", 20, 20)
-    love.graphics.print("Use [UP]/[DOWN] to select, [ENTER] to confirm", 20, 40)
+function Menu:draw()
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.print("tech_plague", 40, 40)
+    love.graphics.print("Use [UP]/[DOWN] to select, [ENTER] to confirm", 40, 70)
 
-    for i, option in ipairs(Menu.options) do
-        local prefix = (i == Menu.selected) and "> " or "  "
-        love.graphics.print(prefix .. option, 20, 80 + (i - 1) * 20)
+    for i, option in ipairs(self.options) do
+        local prefix = (i == self.selected) and "> " or "  "
+        love.graphics.print(prefix .. option, 40, 120 + (i - 1) * 30)
     end
 end
 

@@ -1,0 +1,9 @@
+{
+  "game": {
+    "title": "tech_plague",
+    "start": "Начать игру",
+    "quit": "Выход",
+    "options": "Настройки",
+    "back": "Назад"
+  }
+}
