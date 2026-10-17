@@ -15,6 +15,8 @@ function GameScene.new(opts)
         self.screen = opts.screen or PixelScreen.new(opts)
         self.on_bg_click = opts.on_bg_click
         self.on_update = opts.update
+        self.on_enter = opts.on_enter or opts.enter
+        self.on_leave = opts.on_leave or opts.leave
         self.draw_overlay = opts.draw_overlay
     end
 
@@ -42,9 +44,15 @@ function GameScene:enter(...)
     if self.screen then
         self.screen:enter(...)
     end
+    if self.on_enter then
+        self:on_enter(...)
+    end
 end
 
 function GameScene:leave()
+    if self.on_leave then
+        self:on_leave()
+    end
     if self.screen then
         self.screen:leave()
     end

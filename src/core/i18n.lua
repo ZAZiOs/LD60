@@ -551,6 +551,31 @@ function I18n.init()
         }
     })
 
+    I18n.registerFamily("tahoma", {
+        name = "Tahoma",
+        filter = "nearest",
+        hinting = "mono",
+        line_height = 1.0,
+        aliases = { "tahoma", "Tahoma" },
+        variants = {
+            regular = "assets/fnt/tahoma.ttf",
+            bold    = "assets/fnt/tahomabd.ttf"
+        },
+        sizes = {
+            tiny    = 9,
+            small   = 9,
+            pixel   = 9,
+            default = 9
+        }
+    })
+
+    I18n.registerFont("tahoma9", {
+        path = "assets/fnt/tahoma.ttf",
+        size = 9,
+        hinting = "mono",
+        filter = "nearest"
+    })
+
     I18n.refreshDefaultFonts()
 
     if love and love.graphics and love.graphics.setFont and I18n.fonts.dialog then

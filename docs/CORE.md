@@ -77,41 +77,58 @@ SceneManager.fadeTo("level1", 1.0, {0, 0, 0}) -- Фейд в чёрный цве
 
 ---
 
-## 🖥️ 2. Игра в мониторе (`PixelScreen` + `GameScene`)
+## 🖥️ 2. Игра в мониторе (`PixelScreen` + `GameScene` + `PixelSceneBuilder`)
 
-Канвас 320×240 (пиксель-арт с фильтром `nearest`) внутри монитора на фоне 1920×1080:
+Канвас 320×240 (пиксель-арт с фильтром `nearest`) внутри монитора на фоне 1920×1080.
 
+### Сборка через Fluent Builder:
 ```lua
-local PixelScreen = require("src.core.pixel_screen")
-local GameScene   = require("src.core.game_scene")
+local PixelSceneBuilder = require("src.core.pixel_scene_builder")
+local PixelScreen        = require("src.core.pixel_screen")
+local GameScene          = require("src.core.game_scene")
 
--- 1. Логика игры (рисуется в 320x240, координаты мыши от 0 до 320 и 240):
-local inner_game = {}
+-- 1. Декларативно собираем внутреннюю сцену 320x240:
+local desktop = PixelSceneBuilder.new("desktop")
+    :background("assets/level1/desktop/wp.png")
+    :cursor("assets/cursor.ini")
+    :addSolid("taskbar", { image = "assets/level1/desktop/taskbar.png", x = 0, y = 224, w = 320, h = 16 })
+    :addTab("tab_settings", {
+        idle = "assets/level1/desktop/tab_settings.png",
+        active = "assets/level1/desktop/tab_settings_a.png",
+        x = 115, y = 226,
+        require_key = "down", -- требует зажать кнопку ("down", "up", "left", "right" или имя клавиши)
+        onClick = function(self) self.scene:toggleElement("window_settings") end,
+        onInteract = function(self) self:onClick() end
+    })
+    :addElement({
+        id = "terminal_wall",
+        image = "assets/terminal.png",
+        x = 200, y = 180,
+        is_solid = true,
+        require_collision = "right", -- требует упереться коллизией вправо + зажать направо
+        onInteract = function(self) print("Hacked terminal!") end
+    })
+    :addTooltip("tooltip_readme", {
+        text = "read this\nbefore playing\n(press ↓ + E)",
+        target = "tab_readme",
+        x = 36, y = 168
+    })
+    :addWindow("window_settings", { image = "assets/level1/desktop/window_settings.png", x = 120, y = 120, visible = false, is_solid = true })
+    :spawnPlayer({ x = 30, y = 224, sheet = "assets/rage/rage_sh.ini" })
+    :build()
 
-function inner_game:update(dt) end
+-- Индикатор взаимодействия: 1px белая обводка генерируется ТОЛЬКО когда выполнены все требования
+-- (дистанция + зажатая клавиша `require_key` или упирание в коллизию `require_collision`).
+-- При появлении обводки нажатие E гарантированно взаимодействует с элементом.
 
-function inner_game:draw()
-    love.graphics.setColor(1, 0, 0, 1)
-    love.graphics.rectangle("fill", 10, 10, 50, 50)
-end
+-- Генеративный тултип (:addTooltip): динамически считает размер блока под текст (Tahoma 9px без сглаживания)
+-- и рисует пиксельный белый бабл с хвостиком, указывающим на целевой элемент.
 
-function inner_game:mousepressed(gx, gy, button)
-    print("Клик в игре:", gx, gy) -- координаты 0..320, 0..240
-end
+-- 2. Помещаем в экран монитора:
+local screen = PixelScreen.new({ game = desktop, x = 320, y = 60, w = 1280, h = 960 })
 
--- 2. Создание экрана (дефолтные координаты x=320, y=60, w=1280, h=960 под intro_bg.png):
-local screen = PixelScreen.new({
-    game = inner_game
-    -- x = 320, y = 60, w = 1280, h = 960 -- можно переопределить
-})
-
--- 3. Создание итоговой сцены с фоном:
-return GameScene.new({
-    bg = "assets/bg/intro_bg.png",
-    screen = screen
-})
+return GameScene.new({ bg = "assets/bg/intro_bg.png", screen = screen })
 ```
-
 
 ---
 
@@ -230,10 +247,12 @@ love.graphics.setFont(I18n.fonts.medium) -- 26px
 love.graphics.setFont(I18n.fonts.dialog) -- 32px
 love.graphics.setFont(I18n.fonts.large)  -- 36px
 love.graphics.setFont(I18n.fonts.title)  -- 56px
+love.graphics.setFont(I18n.fonts.tahoma9) -- 9px Tahoma без антиалисинга (hinting = mono, filter = nearest, как в Aseprite)
 
 -- Жирный / кастомный размер:
 love.graphics.setFont(I18n.getFont("medium", "bold"))
 love.graphics.setFont(I18n.getFont(40, "black"))
+love.graphics.setFont(I18n.getFont(9, "regular", "tahoma"))
 love.graphics.setFont(I18n.getFont("title", "regular", "cairopixel")) -- пиксельный шрифт
 ```
 
@@ -297,3 +316,103 @@ Events.emit("quest_done", 500)
 -- 3. Очистить в scene:leave():
 Events.clear("level1")
 ```
+
+---
+
+## 🪟 10. Генеративные Окна (`PixelWindow`) и Пиксельные Сцены (`PixelSceneBuilder`)
+
+Сборка 9-slice окон любого размера с заголовком, кнопкой закрытия, перетаскиванием, скроллом и твердой коллизией:
+
+```lua
+local PixelSceneBuilder = require("src.core.pixel_scene_builder")
+
+local desktop = PixelSceneBuilder.new("desktop")
+    :background("assets/level1/desktop/wp.png")
+    :cursor("assets/cursor.ini")
+    
+    -- Кнопка/вкладка в таскбаре:
+    :addTab("tab_readme", {
+        idle = "assets/level1/desktop/tab_readme.png",
+        active = "assets/level1/desktop/tab_readme_a.png",
+        x = 62,
+        y = 226,
+        onClick = function(self)
+            self.scene:toggleElement("window_readme")
+            local win = self.scene:getElement("window_readme")
+            self.scene:setElementActive("tab_readme", win and win.visible)
+        end
+    })
+
+    -- Генеративное окно (собирается из assets/window.ini и window.png):
+    :addWindow("window_readme", {
+        title = "README.TXT",
+        x = 48,
+        y = 38,
+        w = 192,
+        h = 132,
+        visible = false,
+        is_solid = true,     -- персонаж может прыгать на окно как на платформу
+        draggable = true,    -- можно таскать за заголовок мышкой
+        closeable = true,    -- кнопка [X] в правом верхнем углу
+        text = "Многострочный текст\nКоторый скроллится колесиком мышки!",
+        onClose = function(self)
+            self.scene:setElementActive("tab_readme", false)
+        end
+    })
+
+    -- Окно с интерактивным содержимым на собственном Canvas:
+    :addWindow("window_settings", {
+        title = "SETTINGS.EXE",
+        x = 76,
+        y = 48,
+        w = 168,
+        h = 126,
+        visible = false,
+        is_solid = true
+    })
+
+local win = desktop:getElement("window_settings")
+
+-- Добавление интерактивных виджетов в локальных координатах окна (от 0, 0):
+win:addSlider({
+    id = "slider_music",
+    x = 8,
+    y = 6,
+    w = 136,
+    label = "Music Volume",
+    value = 0.8,
+    onChange = function(self, val)
+        Settings.set("music_volume", val)
+    end
+})
+
+win:addCheckbox({
+    id = "chk_mute",
+    x = 8,
+    y = 52,
+    text = "Mute Audio",
+    checked = false,
+    onChange = function(self, val)
+        Settings.set("muted", val)
+    end
+})
+
+win:addButton({
+    id = "btn_ok",
+    x = 100,
+    y = 90,
+    w = 44,
+    h = 13,
+    text = "OK",
+    onClick = function()
+        win:close()
+    end
+})
+
+-- Прямой доступ к Canvas окна:
+local canvas = win:getCanvas()
+-- Или произвольный рендер:
+-- win.draw_content = function(self, canvas, inner_w, inner_h) ... end
+```
+
+

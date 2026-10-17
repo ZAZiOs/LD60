@@ -1,68 +1,183 @@
 local SceneManager = require("src.core.scene_manager")
 local PixelScreen = require("src.core.pixel_screen")
 local GameScene = require("src.core.game_scene")
+local PixelSceneBuilder = require("src.core.pixel_scene_builder")
+local AudioManager = require("src.core.audio_manager")
 
-local inner_game = {
-    mouse_x = 0,
-    mouse_y = 0,
-    clicks = 0
-}
+local desktop = PixelSceneBuilder.new("desktop")
+    :background("assets/level1/desktop/wp.png")
+    :cursor("assets/cursor.ini")
+    :addElement({
+        id = "tutorial",
+        image = "assets/level1/desktop/tutorial.png",
+        x = 0,
+        y = 0,
+        z_index = 1
+    })
+    :addSolid("taskbar", {
+        image = "assets/level1/desktop/taskbar.png",
+        x = 0,
+        y = 224,
+        w = 320,
+        h = 16
+    })
+    :addTooltip("tooltip_readme", {
+        text = "read this\nbefore playing\n(press \226\134\147 + E)",
+        target = "tab_readme",
+        target_anchor_x = 2,
+        x = 36,
+        y = 168,
+        tail_offset_x = 26,
+        tail_width = 7
+    })
+    :addTab("tab_readme", {
+        idle = "assets/level1/desktop/tab_readme.png",
+        active = "assets/level1/desktop/tab_readme_a.png",
+        x = 62,
+        y = 226,
+        onClick = function(self)
+            self.scene:toggleElement("window_readme")
+            local win = self.scene:getElement("window_readme")
+            self.scene:setElementActive("tab_readme", win and win.visible)
+            local tip = self.scene:getElement("tooltip_readme")
+            if tip then
+                tip.visible = false
+            end
+        end,
+        onInteract = function(self)
+            self:onClick()
+        end
+    })
+    :addTab("tab_settings", {
+        idle = "assets/level1/desktop/tab_settings.png",
+        active = "assets/level1/desktop/tab_settings_a.png",
+        x = 115,
+        y = 226,
+        require_key = "down",
+        onClick = function(self)
+            self.scene:toggleElement("window_settings")
+            local win = self.scene:getElement("window_settings")
+            self.scene:setElementActive("tab_settings", win and win.visible)
+        end,
+        onInteract = function(self)
+            self:onClick()
+        end
+    })
+    :addWindow("window_readme", {
+        title = "README.TXT",
+        x = 48,
+        y = 38,
+        w = 192,
+        h = 132,
+        visible = false,
+        is_solid = true,
+        text = [[Hey, buddy!
 
-function inner_game:enter()
-    print("Entered Level 1 Inner Game")
-end
+I created you so you could help me with a little project. 
 
-function inner_game:update(dt)
-end
+You see, there are some things that are better off not existing. One of those things is the data stored in ViewTech’s data centers. 
 
-function inner_game:draw()
-    love.graphics.setColor(0.1, 0.15, 0.22, 1)
-    love.graphics.rectangle("fill", 0, 0, 320, 240)
+You’ll have to run between computers to get to the data center. Of course, you’ll come across other people’s computers along the way. Please don’t touch anything there. We need to go unnoticed.
 
-    love.graphics.setColor(0.2, 0.3, 0.45, 1)
-    for x = 0, 320, 16 do
-        love.graphics.line(x, 0, x, 240)
-    end
-    for y = 0, 240, 16 do
-        love.graphics.line(0, y, 320, y)
-    end
+In return for all your efforts, I’ll give you the chance to wreak havoc all over the internet. Good luck.]],
+        onClose = function(self)
+            local tab = self.scene:getElement("tab_readme")
+            if tab then
+                self.scene:setElementActive("tab_readme", false)
+            end
+        end
+    })
+    :addWindow("window_settings", {
+        title = "SETTINGS.EXE",
+        x = 76,
+        y = 48,
+        w = 168,
+        h = 126,
+        visible = false,
+        is_solid = true,
+        onClose = function(self)
+            local tab = self.scene:getElement("tab_settings")
+            if tab then
+                self.scene:setElementActive("tab_settings", false)
+            end
+        end
+    })
+    :spawnPlayer({
+        x = 30,
+        y = 224,
+        sheet = "assets/rage/rage_sh.ini"
+    })
+    :onKey(function(self, action, key)
+        if action == "press" then
+            if key == "escape" then
+                SceneManager.goTo("menu")
+            elseif key == "return" then
+                SceneManager.goTo("level2")
+            end
+        end
+    end)
+    :build()
 
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print("GAME CANVAS: 320x240", 12, 12)
-    love.graphics.print("Mouse: " .. self.mouse_x .. ", " .. self.mouse_y, 12, 32)
-    love.graphics.print("Clicks: " .. self.clicks, 12, 52)
-
-    love.graphics.setColor(0.2, 0.8, 0.4, 1)
-    love.graphics.rectangle("fill", self.mouse_x - 3, self.mouse_y - 3, 6, 6)
-
-    love.graphics.setColor(1, 0.8, 0.2, 1)
-    love.graphics.print("[ENTER] -> Level 2", 12, 190)
-    love.graphics.print("[BACKSPACE] -> Menu", 12, 210)
-end
-
-function inner_game:mousepressed(gx, gy, button)
-    self.mouse_x = gx
-    self.mouse_y = gy
-    self.clicks = self.clicks + 1
-end
-
-function inner_game:mousemoved(gx, gy, gdx, gdy, istouch, inside)
-    if inside then
-        self.mouse_x = gx
-        self.mouse_y = gy
-    end
-end
-
-function inner_game:keypressed(key)
-    if key == "return" then
-        SceneManager.fadeTo("level2", 0.5)
-    elseif key == "backspace" then
-        SceneManager.fadeTo("menu", 0.5)
-    end
+local Settings = require("src.core.settings")
+local win_settings = desktop:getElement("window_settings")
+if win_settings then
+    win_settings:addSlider({
+        id = "slider_music",
+        x = 8,
+        y = 6,
+        w = 136,
+        label = "Music Volume",
+        value = Settings.get("music_volume") or 0.8,
+        onChange = function(self, val)
+            Settings.set("music_volume", val)
+        end
+    })
+    win_settings:addSlider({
+        id = "slider_sfx",
+        x = 8,
+        y = 28,
+        w = 136,
+        label = "SFX Volume",
+        value = Settings.get("sfx_volume") or 1.0,
+        onChange = function(self, val)
+            Settings.set("sfx_volume", val)
+        end
+    })
+    win_settings:addCheckbox({
+        id = "chk_mute",
+        x = 8,
+        y = 52,
+        text = "Mute Audio",
+        checked = Settings.get("muted") or false,
+        onChange = function(self, val)
+            Settings.set("muted", val)
+        end
+    })
+    win_settings:addCheckbox({
+        id = "chk_fullscreen",
+        x = 8,
+        y = 68,
+        text = "Fullscreen Mode",
+        checked = Settings.get("fullscreen") or false,
+        onChange = function(self, val)
+            Settings.set("fullscreen", val)
+        end
+    })
+    win_settings:addButton({
+        id = "btn_ok",
+        x = 100,
+        y = 90,
+        w = 44,
+        h = 13,
+        text = "OK",
+        onClick = function()
+            win_settings:close()
+        end
+    })
 end
 
 local screen = PixelScreen.new({
-    game = inner_game,
+    game = desktop,
     x = 320,
     y = 60,
     w = 1280,
@@ -71,7 +186,13 @@ local screen = PixelScreen.new({
 
 local Level1Scene = GameScene.new({
     bg = "assets/bg/intro_bg.png",
-    screen = screen
+    screen = screen,
+    enter = function(self)
+        AudioManager.musFadeTo("cat", 0.8, 0.5)
+    end,
+    leave = function(self)
+        AudioManager.musStop(0.5)
+    end
 })
 
 return Level1Scene

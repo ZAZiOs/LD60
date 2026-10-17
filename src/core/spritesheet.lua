@@ -53,8 +53,9 @@ function Spritesheet:_loadImage(ini_dir)
         local ok, img = pcall(love.graphics.newImage, full_path)
         if ok and img then
             self.image = img
-            local filter = self.meta.filter or "linear"
+            local filter = self.meta.filter or "nearest"
             self.image:setFilter(filter, filter)
+
         else
             print(string.format("[Spritesheet] Error loading image '%s': %s", full_path, tostring(img)))
         end
@@ -99,6 +100,9 @@ end
 
 function Spritesheet:getQuad(frame_id_or_index)
     if type(frame_id_or_index) == "string" then
+        if self.quads[frame_id_or_index] then
+            return self.quads[frame_id_or_index]
+        end
         if self.named_frames[frame_id_or_index] ~= nil then
             local named_val = self.named_frames[frame_id_or_index]
             if type(named_val) == "number" then
@@ -106,9 +110,6 @@ function Spritesheet:getQuad(frame_id_or_index)
             elseif type(named_val) == "table" and named_val.index ~= nil then
                 return self.quads[named_val.index]
             end
-        end
-        if self.quads[frame_id_or_index] then
-            return self.quads[frame_id_or_index]
         end
     end
 

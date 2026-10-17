@@ -32,7 +32,7 @@ function Menu:keypressed(key)
         if self.selected > #self.options then self.selected = 1 end
     elseif key == "return" then
         if self.selected == 1 then
-            SceneManager.fadeTo("level1", 0.5)
+            SceneManager.goTo("level1")
         elseif self.selected == 2 then
             love.event.quit()
         end
