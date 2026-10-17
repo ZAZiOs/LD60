@@ -34,10 +34,23 @@ function Player.new(opts)
     self.facing = 1
     self.is_grounded = false
 
+    self.scale_x = 1
+    self.scale_y = 1
+    self.was_crouching = false
+
     local ini_path = opts.sheet or "assets/rage/rage_sh.ini"
     self.anim = SpritesheetManager.createAnimation(ini_path, "idle")
 
     return self
+end
+
+function Player:jump()
+    self.vy = self.jump_force
+    self.is_grounded = false
+    self.coyote_timer = 0
+    self.jump_buffer_timer = 0
+    self.scale_x = 0.78
+    self.scale_y = 1.3
 end
 
 function Player:getHitbox()
@@ -74,10 +87,7 @@ function Player:update(dt, scene)
     if self.jump_buffer_timer > 0 then
         self.jump_buffer_timer = math.max(0, self.jump_buffer_timer - dt)
         if self.coyote_timer > 0 then
-            self.vy = self.jump_force
-            self.is_grounded = false
-            self.coyote_timer = 0
-            self.jump_buffer_timer = 0
+            self:jump()
         end
     end
 
@@ -137,6 +147,9 @@ function Player:update(dt, scene)
         end
     end
 
+    local was_grounded = self.is_grounded
+    local fall_speed = self.vy
+
     local prev_y = self.y
     self.y = self.y + self.vy * dt
     self.is_grounded = false
@@ -161,6 +174,29 @@ function Player:update(dt, scene)
         self.vy = 0
         self.is_grounded = true
     end
+
+    if not was_grounded and self.is_grounded and fall_speed > 60 then
+        self.scale_x = 1.2
+        self.scale_y = 0.8
+    end
+
+    local is_crouching = self.is_grounded and down_held and math.abs(self.vx) < 5
+    if is_crouching and not self.was_crouching then
+        self.scale_x = 1.24
+        self.scale_y = 0.76
+    elseif not is_crouching and self.was_crouching then
+        if self.is_grounded then
+            self.scale_x = 0.88
+            self.scale_y = 1.12
+        end
+    end
+    self.was_crouching = is_crouching
+
+    local target_sx = is_crouching and 1.12 or 1.0
+    local target_sy = is_crouching and 0.88 or 1.0
+    local recover_speed = 12
+    self.scale_x = self.scale_x + (target_sx - self.scale_x) * math.min(1, dt * recover_speed)
+    self.scale_y = self.scale_y + (target_sy - self.scale_y) * math.min(1, dt * recover_speed)
 
     if self.anim then
         if self.is_grounded then
@@ -187,7 +223,7 @@ function Player:draw()
         love.graphics.setColor(1, 1, 1, 1)
         local draw_x = math.floor(self.x + 0.5)
         local draw_y = math.floor(self.y + 0.5)
-        self.anim:draw(draw_x, draw_y, 0, self.facing, 1, 16, 26)
+        self.anim:draw(draw_x, draw_y, 0, self.facing * self.scale_x, self.scale_y, 16, 26)
     end
 end
 
@@ -282,10 +318,7 @@ function Player:keypressed(key, scene)
     if key == "space" or key == "up" or key == "w" then
         self.jump_buffer_timer = self.jump_buffer_time
         if self.coyote_timer > 0 then
-            self.vy = self.jump_force
-            self.is_grounded = false
-            self.coyote_timer = 0
-            self.jump_buffer_timer = 0
+            self:jump()
         end
     end
 
