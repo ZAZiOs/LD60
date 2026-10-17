@@ -31,13 +31,15 @@ function Menu.keypressed(key)
     end
 end
 
-function Menu.draw()
-    love.graphics.print("tech_plague", 20, 20)
-    love.graphics.print("Use [UP]/[DOWN] to select, [ENTER] to confirm", 20, 40)
+function Menu.draw()    
+    love.graphics.setColor(0, 0, 0) -- Black text
+    
+    love.graphics.print("tech_plague", 60, 50)
+    love.graphics.print("Use [UP]/[DOWN] to select", 60, 80)
 
     for i, option in ipairs(Menu.options) do
         local prefix = (i == Menu.selected) and "> " or "  "
-        love.graphics.print(prefix .. option, 20, 80 + (i - 1) * 20)
+        love.graphics.print(prefix .. option, 60, 120 + (i - 1) * 20)
     end
 end
 
