@@ -1,0 +1,66 @@
+# ==========================================
+# Project-specific
+# ==========================================
+# Build output
+bin/
+
+# Local makelove config (contains machine-specific paths)
+make_all.toml
+
+# ==========================================
+# Python (Virtual Environment)
+# ==========================================
+.venv/
+__pycache__/
+*.pyc
+
+# ==========================================
+# VS Code (keep workspace settings)
+# ==========================================
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# ==========================================
+# Lua / Love2D
+# ==========================================
+# Compiled Lua sources
+luac.out
+
+# luarocks build files
+*.src.rock
+*.zip
+*.tar.gz
+
+# Object files
+*.o
+*.os
+*.ko
+*.obj
+*.elf
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+*.def
+*.exp
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex

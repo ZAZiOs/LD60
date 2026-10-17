@@ -1,0 +1,17 @@
+name = "tech_plague"
+default_targets = ["win64", "lovejs"]
+build_directory = "bin"
+
+love_files = [
+    "./main.lua",
+    "./conf.lua",
+    "./src/*",
+    "./assets/*"
+]
+
+[win64]
+# Set this to the folder containing love.exe on your machine, e.g.:
+# love_binaries = "C:/path/to/love2d"
+
+[lovejs]
+title = "tech_plague"
