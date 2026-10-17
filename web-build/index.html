@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, minimum-scale=1, maximum-scale=1">
+    <title>Banned from Cookie Realm</title>
+
+    <script type="text/javascript">
+      var BUILD_TS = 1792270477151;
+      var tsLink = document.createElement('link');
+      tsLink.rel = 'stylesheet';
+      tsLink.type = 'text/css';
+      tsLink.href = 'theme/love.css?ts=' + BUILD_TS;
+      document.head.appendChild(tsLink);
+    </script>
+  </head>
+  <body>
+    <div id="game-container">
+      <canvas id="loadingCanvas" oncontextmenu="event.preventDefault()" width="1275" height="825"></canvas>
+      <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+    </div>
+
+    <script type='text/javascript'>
+      function goFullScreen(){
+        var el = document.getElementById("game-container") || document.getElementById("canvas");
+        if(el.requestFullScreen)
+            el.requestFullScreen();
+        else if(el.webkitRequestFullScreen)
+            el.webkitRequestFullScreen();
+        else if(el.mozRequestFullScreen)
+            el.mozRequestFullScreen();
+      }
+      var loadingContext = document.getElementById('loadingCanvas').getContext('2d');
+      function drawLoadingText(text) {
+        var canvas = loadingContext.canvas;
+
+        loadingContext.fillStyle = "rgb(0, 0, 0)";
+        loadingContext.fillRect(0, 0, canvas.width, canvas.height);
+
+        loadingContext.font = 'bold 32px sans-serif';
+        loadingContext.textAlign = 'center';
+        loadingContext.fillStyle = "rgb(255, 255, 255)";
+        loadingContext.fillText(text, canvas.width / 2, canvas.height / 2);
+
+        loadingContext.font = '22px sans-serif';
+        loadingContext.fillStyle = "rgb(255, 255, 255)";
+        loadingContext.fillText("Banned from Cookie Realm", canvas.width / 2, canvas.height / 4);
+        loadingContext.fillText("Powered by Love2D WebAssembly", canvas.width / 2, (canvas.height / 4) * 3);
+      }
+
+      window.onload = function () { window.focus(); };
+      window.onclick = function () { window.focus(); };
+
+      window.addEventListener("keydown", function(e) {
+        // space and arrow keys
+        if([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) {
+          e.preventDefault();
+        }
+      }, false);
+
+      var Module = {
+        arguments: ["./game.love"],
+        INITIAL_MEMORY: 67108864,
+        mainScriptUrlOrBlob: 'love.js?ts=' + BUILD_TS,
+        printErr: console.error.bind(console),
+        locateFile: function(path, prefix) {
+          var base = (prefix || '') + path;
+          return base + (base.indexOf('?') >= 0 ? '&' : '?') + 'ts=' + BUILD_TS;
+        },
+        canvas: (function() {
+          var canvas = document.getElementById('canvas');
+          canvas.addEventListener("webglcontextlost", function(e) {
+            alert('WebGL context lost. You will need to reload the page.');
+            e.preventDefault();
+          }, false);
+          return canvas;
+        })(),
+        setStatus: function(text) {
+          if (text) {
+            drawLoadingText(text);
+          } else if (Module.remainingDependencies === 0) {
+            document.getElementById('loadingCanvas').style.display = 'none';
+            document.getElementById('canvas').style.visibility = 'visible';
+          }
+        },
+        totalDependencies: 0,
+        remainingDependencies: 0,
+        monitorRunDependencies: function(left) {
+          this.remainingDependencies = left;
+          this.totalDependencies = Math.max(this.totalDependencies, left);
+          Module.setStatus(left ? 'Загрузка... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'Все ресурсы загружены.');
+        }
+      };
+      Module.setStatus('Загрузка ресурсов...');
+      window.onerror = function(event) {
+        Module.setStatus('Ошибка загрузки. См. консоль браузера.');
+        Module.setStatus = function(text) {
+          if (text) Module.printErr('[post-exception status] ' + text);
+        };
+      };
+
+      var applicationLoad = function(e) {
+        Love(Module);
+      };
+
+      // Динамическая загрузка скриптов с параметром ts против кеша
+      (function() {
+        var s1 = document.createElement('script');
+        s1.type = 'text/javascript';
+        s1.src = 'game.js?ts=' + BUILD_TS;
+        s1.onload = function() {
+          var s2 = document.createElement('script');
+          s2.type = 'text/javascript';
+          s2.async = true;
+          s2.src = 'love.js?ts=' + BUILD_TS;
+          s2.onload = function() {
+            applicationLoad(this);
+          };
+          document.body.appendChild(s2);
+        };
+        document.body.appendChild(s1);
+      })();
+    </script>
+  </body>
+</html>
