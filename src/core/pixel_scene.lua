@@ -457,7 +457,15 @@ function PixelScene:drawElement(el, shader)
     end
     if el.color then
         love.graphics.setColor(el.color[1], el.color[2], el.color[3], el.color[4] or 1)
-        love.graphics.rectangle("fill", el.x, el.y, el.w, el.h)
+        if el.hollow then
+            local line_width = 5
+            love.graphics.rectangle("fill", el.x, el.y, el.w, line_width) -- top
+            love.graphics.rectangle("fill", el.x, el.y + el.h - line_width, el.w, line_width) -- bottom
+            love.graphics.rectangle("fill", el.x, el.y, line_width, el.h) -- left
+            love.graphics.rectangle("fill", el.x + el.w - line_width, el.y, line_width, el.h) -- right
+        else
+            love.graphics.rectangle("fill", el.x, el.y, el.w, el.h)
+        end
         love.graphics.setColor(1, 1, 1, 1)
     end
     if el.draw then
