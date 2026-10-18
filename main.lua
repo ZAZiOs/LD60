@@ -5,8 +5,19 @@ local Settings = require("src.core.settings")
 local I18n = require("src.core.i18n")
 local Effects = require("src.core.effects")
 
-function love.load()
+DEBUG = false
+
+function love.load(args)
     love.window.setTitle("tech_plague")
+
+    if args then
+        for _, v in ipairs(args) do
+            if v == "debug" then
+                DEBUG = true
+                break
+            end
+        end
+    end
 
     Viewport.init()
 
@@ -19,6 +30,10 @@ function love.load()
     SceneManager.register("menu", "src.scenes.menu")
     SceneManager.register("level1", "src.scenes.level1")
     SceneManager.register("level2", "src.scenes.level2")
+
+    if DEBUG then
+        SceneManager.register("test_camera", "src.scenes.test_camera") 
+    end
 
     SceneManager.goTo("menu")
 end
@@ -50,6 +65,37 @@ function love.keypressed(key, scancode, isrepeat)
         love.event.quit()
         return
     end
+
+    -- DEBUG: Room switching with [ and ]
+    if DEBUG then
+        local current = SceneManager.getCurrentName()
+        -- Rooms for debug
+        local debug_rooms = { "menu", "test_camera", "level1", "level2" }
+        
+        -- Current index
+        local current_index = 1
+        for i, name in ipairs(debug_rooms) do
+            if name == current then
+                current_index = i
+                break
+            end
+        end
+
+        if key == "]" then
+            -- Next room
+            local next_index = current_index + 1
+            if next_index > #debug_rooms then next_index = 1 end
+            SceneManager.goTo(debug_rooms[next_index])
+            return
+        elseif key == "[" then
+            -- Previous room
+            local prev_index = current_index - 1
+            if prev_index < 1 then prev_index = #debug_rooms end
+            SceneManager.goTo(debug_rooms[prev_index])
+            return
+        end
+    end
+
     SceneManager.keypressed(key, scancode, isrepeat)
 end
 

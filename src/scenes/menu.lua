@@ -48,6 +48,11 @@ function Menu:draw()
         local prefix = (i == self.selected) and "> " or "  "
         love.graphics.print(prefix .. option, 40, 120 + (i - 1) * 30)
     end
+
+    if DEBUG then
+        love.graphics.setColor(1, 0.1, 0.1, 1)
+        love.graphics.print("DEBUG mode is ON! Switch between rooms with [ and ]", 40, 300)
+    end
 end
 
 return Menu
