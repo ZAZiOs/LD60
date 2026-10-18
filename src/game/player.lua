@@ -1,5 +1,44 @@
 local SpritesheetManager = require("src.core.spritesheet_manager")
 
+local function getElementBoxes(el)
+    if el.getCollisionBoxes then
+        return el:getCollisionBoxes()
+    elseif el.collisions and #el.collisions > 0 then
+        local boxes = {}
+        for _, c in ipairs(el.collisions) do
+            local is_rel = (c.relative ~= false and c.is_relative ~= false and not c.absolute)
+            local cx = c.x or c[1] or 0
+            local cy = c.y or c[2] or 0
+            local cw = c.w or c[3] or el.w
+            local ch = c.h or c[4] or el.h
+            local bx = is_rel and (el.x + cx) or cx
+            local by = is_rel and (el.y + cy) or cy
+            local one_way = (c.one_way == true or c.top_only == true or c.is_one_way == true or el.is_one_way == true or el.one_way == true or el.top_only == true)
+            table.insert(boxes, {
+                x = bx,
+                y = by,
+                w = cw,
+                h = ch,
+                one_way = one_way,
+                is_one_way = one_way,
+                top_only = one_way
+            })
+        end
+        return boxes
+    else
+        local one_way = (el.is_one_way == true or el.one_way == true or el.top_only == true)
+        return { {
+            x = el.x,
+            y = el.y,
+            w = el.w,
+            h = el.h,
+            one_way = one_way,
+            is_one_way = one_way,
+            top_only = one_way
+        } }
+    end
+end
+
 local Player = {}
 Player.__index = Player
 
@@ -131,17 +170,22 @@ function Player:update(dt, scene)
 
     if scene and scene.elements then
         for _, el in ipairs(scene.elements) do
-            if el.visible and el.is_solid and not el.is_one_way then
-                local ex, ey, ew, eh = el.x, el.y, el.w, el.h
-                if (self.y > ey + 2) and (self.y - self.box_h < ey + eh - 2) then
-                    if self.vx > 0 and prev_x + half_w <= ex + 1 and (self.x + half_w) >= ex then
-                        self.x = ex - half_w
-                        self.vx = 0
-                        self.touching_right_solid = el
-                    elseif self.vx < 0 and prev_x - half_w >= ex + ew - 1 and (self.x - half_w) <= ex + ew then
-                        self.x = ex + ew + half_w
-                        self.vx = 0
-                        self.touching_left_solid = el
+            if el.visible and el.is_solid and not (el.is_one_way or el.one_way or el.top_only) then
+                local boxes = getElementBoxes(el)
+                for _, box in ipairs(boxes) do
+                    if not (box.one_way or box.top_only or box.is_one_way) then
+                        local ex, ey, ew, eh = box.x, box.y, box.w, box.h
+                        if (self.y > ey + 2) and (self.y - self.box_h < ey + eh - 2) then
+                            if self.vx > 0 and prev_x + half_w <= ex + 1 and (self.x + half_w) >= ex then
+                                self.x = ex - half_w
+                                self.vx = 0
+                                self.touching_right_solid = el
+                            elseif self.vx < 0 and prev_x - half_w >= ex + ew - 1 and (self.x - half_w) <= ex + ew then
+                                self.x = ex + ew + half_w
+                                self.vx = 0
+                                self.touching_left_solid = el
+                            end
+                        end
                     end
                 end
             end
@@ -155,19 +199,38 @@ function Player:update(dt, scene)
     self.y = self.y + self.vy * dt
     self.is_grounded = false
 
+    local landed_y = nil
     if scene and scene.elements then
         for _, el in ipairs(scene.elements) do
             if el.visible and el.is_solid then
-                local ex, ey, ew, eh = el.x, el.y, el.w, el.h
-                if (self.x + half_w) > ex and (self.x - half_w) < (ex + ew) then
-                    if self.vy >= 0 and prev_y <= ey + 2 and self.y >= ey then
-                        self.y = ey
-                        self.vy = 0
-                        self.is_grounded = true
+                local boxes = getElementBoxes(el)
+                for _, box in ipairs(boxes) do
+                    local ex, ey, ew, eh = box.x, box.y, box.w, box.h
+                    if (self.x + half_w) > ex and (self.x - half_w) < (ex + ew) then
+                        local can_land = false
+
+                        -- Normal landing when falling from above
+                        if self.vy >= 0 and prev_y <= ey + 2 and self.y >= ey then
+                            can_land = true
+                        -- Smooth step-up onto small rims/bumps (<= 4px) when moving along ground
+                        elseif was_grounded and prev_y >= ey and (prev_y - ey) <= 4 then
+                            can_land = true
+                        end
+
+                        if can_land then
+                            if not landed_y or ey < landed_y then
+                                landed_y = ey
+                            end
+                        end
                     end
                 end
             end
         end
+    end
+    if landed_y then
+        self.y = landed_y
+        self.vy = 0
+        self.is_grounded = true
     end
 
     local room_h = (scene and scene.room_height) or 240
@@ -252,37 +315,41 @@ end
 
 function Player:checkCollisionDir(el, dir)
     if not dir then return true end
-    local ex, ey, ew, eh = el.x, el.y, el.w, el.h
     local half_w = self.box_w / 2
     local px = self.x - half_w
     local py = self.y - self.box_h
     local pw = self.box_w
     local ph = self.box_h
 
-    if dir == "right" then
-        if not self:isHoldingKey("right") then return false end
-        if self.touching_right_solid == el then return true end
-        local overlap_y = (py + ph > ey + 2) and (py < ey + eh - 2)
-        local touching = math.abs((px + pw) - ex) <= 4
-        return overlap_y and touching
-    elseif dir == "left" then
-        if not self:isHoldingKey("left") then return false end
-        if self.touching_left_solid == el then return true end
-        local overlap_y = (py + ph > ey + 2) and (py < ey + eh - 2)
-        local touching = math.abs(px - (ex + ew)) <= 4
-        return overlap_y and touching
-    elseif dir == "down" then
-        if not self:isHoldingKey("down") then return false end
-        local overlap_x = (px + pw > ex + 2) and (px < ex + ew - 2)
-        local touching = math.abs((py + ph) - ey) <= 4 or ((py + ph >= ey) and (py + ph <= ey + eh + 4))
-        return overlap_x and touching
-    elseif dir == "up" then
-        if not self:isHoldingKey("up") then return false end
-        local overlap_x = (px + pw > ex + 2) and (px < ex + ew - 2)
-        local touching = math.abs(py - (ey + eh)) <= 4
-        return overlap_x and touching
+    local boxes = getElementBoxes(el)
+    for _, box in ipairs(boxes) do
+        local ex, ey, ew, eh = box.x, box.y, box.w, box.h
+
+        if dir == "right" then
+            if not self:isHoldingKey("right") then return false end
+            if self.touching_right_solid == el then return true end
+            local overlap_y = (py + ph > ey + 2) and (py < ey + eh - 2)
+            local touching = math.abs((px + pw) - ex) <= 4
+            if overlap_y and touching then return true end
+        elseif dir == "left" then
+            if not self:isHoldingKey("left") then return false end
+            if self.touching_left_solid == el then return true end
+            local overlap_y = (py + ph > ey + 2) and (py < ey + eh - 2)
+            local touching = math.abs(px - (ex + ew)) <= 4
+            if overlap_y and touching then return true end
+        elseif dir == "down" then
+            if not self:isHoldingKey("down") then return false end
+            local overlap_x = (px + pw > ex + 2) and (px < ex + ew - 2)
+            local touching = math.abs((py + ph) - ey) <= 4 or ((py + ph >= ey) and (py + ph <= ey + eh + 4))
+            if overlap_x and touching then return true end
+        elseif dir == "up" then
+            if not self:isHoldingKey("up") then return false end
+            local overlap_x = (px + pw > ex + 2) and (px < ex + ew - 2)
+            local touching = math.abs(py - (ey + eh)) <= 4
+            if overlap_x and touching then return true end
+        end
     end
-    return true
+    return false
 end
 
 function Player:canInteractWith(el)
@@ -302,18 +369,33 @@ function Player:canInteractWith(el)
         return false
     end
 
-    if el.canInteract and not el:canInteract(self) then
-        return false
+    if el.canInteract ~= nil then
+        if type(el.canInteract) == "function" then
+            local ok, can = pcall(el.canInteract, el, self)
+            if not ok or not can then
+                return false
+            end
+        elseif not el.canInteract then
+            return false
+        end
     end
 
-    local ex, ey, ew, eh = el.x, el.y, el.w, el.h
+    local boxes = getElementBoxes(el)
+    local min_dist_ok = false
     local px = self.x - self.box_w / 2
     local py = self.y - self.box_h
     local pw = self.box_w
     local ph = self.box_h
-    local dx = math.max(0, math.max(ex - (px + pw), px - (ex + ew)))
-    local dy = math.max(0, math.max(ey - (py + ph), py - (ey + eh)))
-    return dx <= 10 and dy <= 12
+    for _, box in ipairs(boxes) do
+        local ex, ey, ew, eh = box.x, box.y, box.w, box.h
+        local dx = math.max(0, math.max(ex - (px + pw), px - (ex + ew)))
+        local dy = math.max(0, math.max(ey - (py + ph), py - (ey + eh)))
+        if dx <= 10 and dy <= 12 then
+            min_dist_ok = true
+            break
+        end
+    end
+    return min_dist_ok
 end
 
 function Player:keypressed(key, scene)

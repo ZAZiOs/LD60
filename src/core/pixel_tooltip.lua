@@ -10,7 +10,7 @@ function PixelTooltip.new(opts)
     self.id = opts.id or "tooltip"
     self.text = opts.text or ""
     self.visible = (opts.visible ~= false)
-    self.z_index = opts.z_index or 70
+    self.z_index = opts.z_index or 2000
     self.clickable = (opts.clickable ~= false)
     self.onClick = opts.onClick
 

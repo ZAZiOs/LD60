@@ -22,14 +22,23 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
         image = "assets/level1/bed_main.png",
         x = 205,
         y = 189,
-        h = 83
+        collisions = {
+            { x = 4, y = 6, w = 81, h = 29 },
+            { x = 21, y = 4, w = 47, h = 2 },
+            { x = 30, y = 3, w = 29, h = 2 }
+        }
     })
-    :addSolid("bed_back", {
+    :addOneWay("bed_back", {
         image = "assets/level1/bed_back.png",
         x = 205,
         y = 170,
-        h = -3,
         z_index = -3,
+        collisions = {
+            {x = 6, y = 5, w = 75, h = -1},
+            {10, 4, 67, 6},
+            {22, 1, 43, 7},
+            {30, 0, 27, 5}
+        }
     })
 
     -- bg-attached shelves
@@ -62,6 +71,11 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
         image = "assets/level1/lamp.png",
         x = 133,
         y = 38,
+        collisions = {
+            {2, 8, 55, 5},
+            {2, 0, 4, 13},
+            {53, 0, 4, 13}
+        }
     })
     :addElement({
         id = "cable",
@@ -101,6 +115,9 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
         x = 55,
         y = 187,
         z_index = 2,
+        canInteract = function(self)
+            return not GameState.get("level1_chest_opened")
+        end,
         onInteract = function(self)
             if GameState.get("level1_key_collected") then
                 self.image = "assets/level1/chest_open.png"
@@ -110,9 +127,6 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
                     self.img_obj = img
                 end
                 GameState.set("level1_chest_opened", true)
-                if not GameState.get("level1_crowbar_collected") then
-                    self.scene:getElement("crowbar").visible = true
-                end
                 if not GameState.get("level1_note_collected") then
                     self.scene:getElement("note").visible = true
                 end
@@ -125,6 +139,9 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
         x = 300,
         y = 200,
         z_index = 2,
+        canInteract = function(self)
+            return not GameState.get("level1_key_collected")
+        end,
         onInteract = function(self)
             if not GameState.get("level1_key_collected", false) then
                 GameState.set("level1_key_collected", true)
@@ -133,11 +150,38 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
         end
     })
     :addElement({
-        id = "whatnot",
-        image = "assets/level1/chest.png",
+        id = "wardrobe",
+        image = "assets/level1/wardrobe.png",
         x = 5,
         y = 117,
         z_index = -2,
+    })
+    :addElement({
+        id = "wardrobe_segment",
+        image = "assets/level1/wardrobe_chest_closed.png",
+        x = 8,
+        y = 186,
+        z_index = -1,
+        canInteract = function(self)
+            return GameState.get("level1_note_collected") and not GameState.get("level1_wardrobe_opened")
+        end,
+        onInteract = function(self)
+            if GameState.get("level1_note_collected") and not GameState.get("level1_wardrobe_opened") then
+                self.image = "assets/level1/wardrobe_chest_open.png"
+                local ok, img = pcall(love.graphics.newImage, self.image)
+                if ok and img then
+                    img:setFilter("nearest", "nearest")
+                    self.img_obj = img
+                    self.w = img:getWidth()
+                    self.h = img:getHeight()
+                end
+                GameState.set("level1_wardrobe_opened", true)
+                local crowbar = self.scene:getElement("crowbar")
+                if crowbar and not GameState.get("level1_crowbar_collected") then
+                    crowbar.visible = true
+                end
+            end
+        end
     })
     :addElement({
         id = "note",
@@ -146,6 +190,9 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
         y = 160,
         z_index = 0,
         visible = false,
+        canInteract = function(self)
+            return GameState.get("level1_chest_opened") and not GameState.get("level1_note_collected")
+        end,
         onInteract = function(self)
             if GameState.get("level1_chest_opened") then
                 GameState.set("level1_note_collected", true)
@@ -157,12 +204,15 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
     :addElement({
         id = "crowbar",
         image = "assets/level1/fomka.png",
-        x = 20,
-        y = 160,
+        x = 12,
+        y = 190,
         z_index = 0,
         visible = false,
+        canInteract = function(self)
+            return GameState.get("level1_wardrobe_opened") and not GameState.get("level1_crowbar_collected")
+        end,
         onInteract = function(self)
-            if GameState.get("level1_chest_opened") then
+            if GameState.get("level1_wardrobe_opened") then
                 GameState.set("level1_crowbar_collected", true)
                 self.visible = false
             end
@@ -190,7 +240,6 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
         y = 40,
         w = 180,
         h = 120,
-        z_index = 50,
         visible = false,
         text = [[October 17
 

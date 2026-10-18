@@ -56,7 +56,7 @@ function PixelWindow.new(opts)
     self.is_window = true
     self.clickable = (opts.clickable ~= false)
     self.is_solid = (opts.is_solid == true)
-    self.z_index = opts.z_index or 10
+    self.z_index = opts.z_index or 100
 
     self.closeable = (opts.closeable ~= false)
     self.draggable = (opts.draggable ~= false)

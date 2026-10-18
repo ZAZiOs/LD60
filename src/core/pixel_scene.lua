@@ -123,6 +123,56 @@ function PixelScene:addElement(elem)
     elem.h = elem.h or (elem.img_obj and elem.img_obj:getHeight()) or 0
     elem.scene = self
 
+    if not elem.getCollisionBoxes then
+        elem.getCollisionBoxes = function(self)
+            if self.collisions and #self.collisions > 0 then
+                local boxes = {}
+                for _, c in ipairs(self.collisions) do
+                    local is_rel = (c.relative ~= false and c.is_relative ~= false and not c.absolute)
+                    local cx = c.x or c[1] or 0
+                    local cy = c.y or c[2] or 0
+                    local cw = c.w or c[3] or self.w
+                    local ch = c.h or c[4] or self.h
+                    local bx = is_rel and (self.x + cx) or cx
+                    local by = is_rel and (self.y + cy) or cy
+                    local one_way = (c.one_way == true or c.top_only == true or c.is_one_way == true or self.is_one_way == true or self.one_way == true or self.top_only == true)
+                    table.insert(boxes, {
+                        x = bx,
+                        y = by,
+                        w = cw,
+                        h = ch,
+                        one_way = one_way,
+                        is_one_way = one_way,
+                        top_only = one_way
+                    })
+                end
+                return boxes
+            else
+                local one_way = (self.is_one_way == true or self.one_way == true or self.top_only == true)
+                return { {
+                    x = self.x,
+                    y = self.y,
+                    w = self.w,
+                    h = self.h,
+                    one_way = one_way,
+                    is_one_way = one_way,
+                    top_only = one_way
+                } }
+            end
+        end
+    end
+
+    if elem.is_window then
+        elem.z_index = elem.z_index or 100
+    elseif elem.is_taskbar or elem.id == "taskbar" or (type(elem.id) == "string" and elem.id:match("^taskbar")) then
+        elem.is_taskbar = true
+        elem.z_index = elem.z_index or 1000
+        if elem.clickable == nil then elem.clickable = true end
+        if elem.onClick == nil then elem.onClick = function() return true end end
+    elseif elem.is_tab then
+        elem.z_index = elem.z_index or 1010
+    end
+
     elem.z_index = elem.z_index or 0
     table.insert(self.elements, elem)
     self.elements_by_id[elem.id] = elem
@@ -137,10 +187,26 @@ function PixelScene:_sortElements()
     end)
 end
 
+local WINDOW_Z_MIN = 100
+local WINDOW_Z_MAX = 899
+
 function PixelScene:bringToFront(id)
     local el = self.elements_by_id[id]
     if not el then return end
-    self.window_z = math.max(self.window_z or 10, (el.z_index or 10)) + 1
+    self.window_z = math.max(self.window_z or WINDOW_Z_MIN, (el.z_index or WINDOW_Z_MIN)) + 1
+    if self.window_z >= WINDOW_Z_MAX then
+        local windows = {}
+        for _, e in ipairs(self.elements) do
+            if e.is_window then
+                table.insert(windows, e)
+            end
+        end
+        table.sort(windows, function(a, b) return (a.z_index or 0) < (b.z_index or 0) end)
+        for idx, win in ipairs(windows) do
+            win.z_index = WINDOW_Z_MIN + idx
+        end
+        self.window_z = WINDOW_Z_MIN + #windows + 1
+    end
     el.z_index = self.window_z
     self:_sortElements()
 end
@@ -192,12 +258,31 @@ function PixelScene:leave()
     end
 end
 
+local function elementCanInteract(el, player)
+    if not el or not el.visible then return false end
+    if el.interactable == false then return false end
+    if el.canInteract ~= nil then
+        if type(el.canInteract) == "function" then
+            local ok, can = pcall(el.canInteract, el, player)
+            if not ok or not can then
+                return false
+            end
+        elseif not el.canInteract then
+            return false
+        end
+    end
+    return true
+end
+
 function PixelScene:getHoveredElement()
     if not self.mouse_inside then return nil end
     for i = #self.elements, 1, -1 do
         local el = self.elements[i]
-        if el.visible and el.clickable and not el.is_window then
+        if el.visible and el.clickable then
             if self.mouse_gx >= el.x and self.mouse_gx < el.x + el.w and self.mouse_gy >= el.y and self.mouse_gy < el.y + el.h then
+                if el.is_taskbar or el.is_window or not elementCanInteract(el, self.player) then
+                    return nil
+                end
                 return el
             end
         end
@@ -210,7 +295,7 @@ function PixelScene:getInteractableElement()
     local best_el = nil
     local best_dist = math.huge
     for _, el in ipairs(self.elements) do
-        if el.visible and not el.is_window and (el.onInteract or el.interactable or (el.clickable and el.onClick)) then
+        if el.visible and not el.is_window and not el.is_taskbar and elementCanInteract(el, self.player) and (el.onInteract or el.interactable or (el.clickable and el.onClick)) then
             if self.player:canInteractWith(el) then
                 local ecx = el.x + el.w / 2
                 local ecy = el.y + el.h / 2
@@ -228,7 +313,7 @@ function PixelScene:getInteractableElement()
 end
 
 function PixelScene:canInteractWith(el)
-    if not el or not el.visible then return false end
+    if not elementCanInteract(el, self.player) then return false end
     return self:getInteractableElement() == el
 end
 
@@ -351,6 +436,32 @@ function PixelScene:draw()
 
     if self.player then
         self.player:draw()
+    end
+
+    if DEBUG then
+        for _, el in ipairs(self.elements) do
+            if el.visible and el.is_solid then
+                local boxes = el.getCollisionBoxes and el:getCollisionBoxes() or { { x = el.x, y = el.y, w = el.w, h = el.h } }
+                for _, b in ipairs(boxes) do
+                    if b.one_way then
+                        love.graphics.setColor(0.2, 0.8, 1.0, 0.5)
+                        love.graphics.rectangle("line", b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1)
+                        love.graphics.setColor(1, 1, 0, 0.9)
+                        love.graphics.line(b.x, b.y + 0.5, b.x + b.w, b.y + 0.5)
+                    else
+                        love.graphics.setColor(0.1, 1, 0.2, 0.75)
+                        love.graphics.rectangle("line", b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1)
+                    end
+                end
+            end
+        end
+        if self.player then
+            love.graphics.setColor(1, 0.2, 0.2, 0.75)
+            local pw = self.player.box_w or 10
+            local ph = self.player.box_h or 24
+            love.graphics.rectangle("line", math.floor(self.player.x - pw / 2) + 0.5, math.floor(self.player.y - ph) + 0.5, pw - 1, ph - 1)
+        end
+        love.graphics.setColor(1, 1, 1, 1)
     end
 
     if self.camera and (self.camera.x ~= 0 or self.camera.y ~= 0) then

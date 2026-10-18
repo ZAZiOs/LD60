@@ -32,6 +32,43 @@ function PixelSceneBuilder:addSolid(id, opts)
     opts = opts or {}
     opts.id = id
     opts.is_solid = true
+    if opts.is_taskbar or id == "taskbar" or (type(id) == "string" and id:match("^taskbar")) then
+        opts.is_taskbar = true
+        opts.z_index = opts.z_index or 1000
+        if opts.clickable == nil then
+            opts.clickable = true
+        end
+        if opts.onClick == nil then
+            opts.onClick = function() return true end
+        end
+    else
+        opts.z_index = opts.z_index or 50
+    end
+    self.scene:addElement(opts)
+    return self
+end
+
+function PixelSceneBuilder:addTaskbar(id, opts)
+    opts = opts or {}
+    opts.id = id or "taskbar"
+    opts.is_solid = (opts.is_solid ~= false)
+    opts.is_taskbar = true
+    opts.z_index = opts.z_index or 1000
+    if opts.clickable == nil then
+        opts.clickable = true
+    end
+    if opts.onClick == nil then
+        opts.onClick = function() return true end
+    end
+    self.scene:addElement(opts)
+    return self
+end
+
+function PixelSceneBuilder:addOneWay(id, opts)
+    opts = opts or {}
+    opts.id = id
+    opts.is_solid = true
+    opts.one_way = true
     opts.z_index = opts.z_index or 50
     self.scene:addElement(opts)
     return self
@@ -40,13 +77,14 @@ end
 function PixelSceneBuilder:addTab(id, opts)
     opts = opts or {}
     opts.id = id
+    opts.is_tab = true
     opts.image = opts.idle or opts.image
     opts.active_image = opts.active or opts.active_image
     opts.clickable = (opts.clickable ~= false)
     if opts.require_key == nil and opts.hold_key == nil and opts.require_collision == nil and opts.requires_down == nil then
         opts.require_key = "down"
     end
-    opts.z_index = opts.z_index or 60
+    opts.z_index = opts.z_index or 1010
     self.scene:addElement(opts)
     return self
 end
@@ -55,11 +93,11 @@ function PixelSceneBuilder:addWindow(id, opts)
     local PixelWindow = require("src.core.pixel_window")
     opts = opts or {}
     opts.id = id
+    opts.is_window = true
+    opts.z_index = opts.z_index or 100
     if opts.image then
         opts.visible = (opts.visible == true)
-        opts.is_window = true
         opts.clickable = (opts.clickable ~= false)
-        opts.z_index = opts.z_index or 10
         self.scene:addElement(opts)
     else
         local win = PixelWindow.new(opts)
@@ -72,6 +110,7 @@ function PixelSceneBuilder:addTooltip(id, opts)
     local PixelTooltip = require("src.core.pixel_tooltip")
     opts = opts or {}
     opts.id = id
+    opts.z_index = opts.z_index or 2000
     local tip = PixelTooltip.new(opts)
     self.scene:addElement(tip)
     return self
