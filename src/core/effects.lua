@@ -6,6 +6,7 @@ local crtShader
 local asciiShader
 local asciiAtlas
 local asciiCanvas
+local asciiCrtCanvas
 local time = 0
 
 local CELL_W, CELL_H = 20, 20
@@ -42,6 +43,9 @@ function Effects.load()
     
     asciiCanvas = love.graphics.newCanvas(1280, 960)
     asciiCanvas:setFilter("nearest", "nearest")
+
+    asciiCrtCanvas = love.graphics.newCanvas(1280, 960)
+    asciiCrtCanvas:setFilter("nearest", "nearest")
 end
 
 function Effects.update(dt)
@@ -50,29 +54,39 @@ end
 
 function Effects.drawAsciiCrt(canvas, x, y, scale_x, scale_y)
     local canvasW, canvasH = canvas:getDimensions()
-    local realX, realY = Viewport.toScreen(x, y)
-    local viewportScale = Viewport.getScale()
-    local zoneW = 1280 * viewportScale
-    local zoneH = 960 * viewportScale
 
-    -- 1. Render the game into asciiCanvas with a clean state
+    -- Render the ASCII pass into a canvas matching the final screen size.
     love.graphics.push("all")          -- saves canvas, transform, scissor, shader, color
     love.graphics.setCanvas(asciiCanvas)
     love.graphics.origin()             -- drop Viewport translate/scale
     love.graphics.setScissor()         -- drop Viewport scissor
     love.graphics.clear(0, 0, 0, 1)
     love.graphics.setColor(1, 1, 1, 1)
+    asciiShader:send("texSize", { 1280, 960 })
+    asciiShader:send("zone", { 0, 0, 1280, 960 })
+    love.graphics.setShader(asciiShader)
     love.graphics.draw(canvas, 0, 0, 0, 1280 / canvasW, 960 / canvasH)
+    love.graphics.setShader()
     love.graphics.pop()                -- restores previous canvas + Viewport transform/scissor
 
-    -- 2. Draw to the screen through the ASCII shader
-    asciiShader:send("texSize", { 1280, 960 })
-    asciiShader:send("zone", { realX, realY, zoneW, zoneH })
-
-    love.graphics.setShader(asciiShader)
+    -- Apply CRT into a scene-local-size canvas, where shader coordinates are
+    -- always 0..1280 by 0..960, including while the scene is in a transition.
+    love.graphics.push("all")
+    love.graphics.setCanvas(asciiCrtCanvas)
+    love.graphics.origin()
+    love.graphics.setScissor()
+    love.graphics.clear(0, 0, 0, 1)
+    crtShader:send("texSize", { 1280, 960 })
+    crtShader:send("zone", { 0, 0, 1280, 960 })
+    crtShader:send("time", time)
+    love.graphics.setShader(crtShader)
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.draw(asciiCanvas, x, y, 0, 1, 1)
-    love.graphics.setShader()
+    love.graphics.draw(asciiCanvas, 0, 0)
+    love.graphics.pop()
+
+    -- Blit the completed CRT image at the screen's virtual dimensions.
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.draw(asciiCrtCanvas, x, y)
 end
 
 function Effects.drawCrt(canvas, x, y, scale_x, scale_y)
