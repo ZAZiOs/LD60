@@ -184,6 +184,37 @@ end
 
 function Player:update(dt, scene)
     self.scene = scene
+
+    if self.is_dead then
+        self.vx = 0
+        self.vy = 0
+        return
+    end
+
+    if self.hide_cooldown and self.hide_cooldown > 0 then
+        self.hide_cooldown = self.hide_cooldown - dt
+    end
+
+    if self.is_hidden then
+        if (self.hide_cooldown or 0) <= 0 then
+            local move_pressed = love.keyboard.isDown("left") or love.keyboard.isDown("a") or
+                                 love.keyboard.isDown("right") or love.keyboard.isDown("d") or
+                                 love.keyboard.isDown("space") or love.keyboard.isDown("up") or
+                                 love.keyboard.isDown("w")
+            if move_pressed then
+                self.is_hidden = false
+            else
+                self.vx = 0
+                self.vy = 0
+                return
+            end
+        else
+            self.vx = 0
+            self.vy = 0
+            return
+        end
+    end
+
     local move = 0
     local down_held = love.keyboard.isDown("down") or love.keyboard.isDown("s")
 
@@ -637,6 +668,10 @@ local function drawPixelArrowTip(tx, ty, rx, ry, facing)
 end
 
 function Player:draw()
+    if self.is_hidden or self.is_dead then
+        return
+    end
+
     if #self.slide_particles > 0 then
         for _, p in ipairs(self.slide_particles) do
             local current_alpha = (p.life / p.max_life) * p.alpha
@@ -773,6 +808,21 @@ function Player:canInteractWith(el)
 end
 
 function Player:keypressed(key, scene)
+    if self.is_dead then
+        return
+    end
+
+    if self.is_hidden then
+        if (self.hide_cooldown or 0) > 0 then
+            return
+        end
+        if key == "e" or key == "space" or key == "up" or key == "w" or
+           key == "left" or key == "a" or key == "right" or key == "d" then
+            self.is_hidden = false
+            return
+        end
+    end
+
     if key == "space" or key == "up" or key == "w" then
         self.jump_buffer_timer = self.jump_buffer_time
         if self.coyote_timer > 0 then

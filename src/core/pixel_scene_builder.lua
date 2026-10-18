@@ -32,8 +32,9 @@ function PixelSceneBuilder:addSolid(id, opts)
     opts = opts or {}
     opts.id = id
     opts.is_solid = true
-    if opts.is_taskbar or id == "taskbar" or (type(id) == "string" and id:match("^taskbar")) then
+    if opts.is_taskbar or id == "taskbar" then
         opts.is_taskbar = true
+        opts.fixed = (opts.fixed ~= false)
         opts.z_index = opts.z_index or 1000
         if opts.clickable == nil then
             opts.clickable = true
@@ -53,6 +54,7 @@ function PixelSceneBuilder:addTaskbar(id, opts)
     opts.id = id or "taskbar"
     opts.is_solid = (opts.is_solid ~= false)
     opts.is_taskbar = true
+    opts.fixed = (opts.fixed ~= false)
     opts.z_index = opts.z_index or 1000
     if opts.clickable == nil then
         opts.clickable = true
@@ -78,6 +80,7 @@ function PixelSceneBuilder:addTab(id, opts)
     opts = opts or {}
     opts.id = id
     opts.is_tab = true
+    opts.fixed = (opts.fixed ~= false)
     opts.image = opts.idle or opts.image
     opts.active_image = opts.active or opts.active_image
     opts.clickable = (opts.clickable ~= false)
@@ -94,6 +97,7 @@ function PixelSceneBuilder:addWindow(id, opts)
     opts = opts or {}
     opts.id = id
     opts.is_window = true
+    opts.scene = self.scene
     opts.z_index = opts.z_index or 100
     if opts.image then
         opts.visible = (opts.visible == true)
@@ -113,6 +117,163 @@ function PixelSceneBuilder:addTooltip(id, opts)
     opts.z_index = opts.z_index or 2000
     local tip = PixelTooltip.new(opts)
     self.scene:addElement(tip)
+    return self
+end
+
+function PixelSceneBuilder:addBookshelf(id, opts)
+    opts = opts or {}
+    if type(id) == "table" and opts == nil then
+        opts = id
+        id = opts.id
+    end
+    opts.id = id or ("bookshelf_" .. tostring(math.random(1000, 9999)))
+    opts.is_bookshelf = true
+    opts.is_solid = false
+    opts.z_index = opts.z_index or 15
+    opts.clickable = false
+    opts.interactable = true
+
+    if not opts.image then
+        local variants = {
+            "assets/level3/bookshelf1.png",
+            "assets/level3/bookshelf2.png",
+            "assets/level3/bookshelf3.png"
+        }
+        opts.image = variants[math.random(1, #variants)]
+    end
+    opts.orig_image = opts.image
+
+    opts.w = opts.w or 77
+    opts.h = opts.h or 97
+
+    opts.has_bomb = (opts.has_bomb == true)
+    opts.is_exploded = false
+    opts.exploding = false
+    opts.explosion_timer = 0
+
+    function opts:reset()
+        self.is_exploded = false
+        self.exploding = false
+        self.explosion_timer = 0
+        if not self.orig_image or self.orig_image:find("boom") then
+            self.orig_image = "assets/level3/bookshelf1.png"
+        end
+        self.image = self.orig_image
+        if self.orig_img_obj then
+            self.img_obj = self.orig_img_obj
+        else
+            local ok, img = pcall(love.graphics.newImage, self.image)
+            if ok and img then
+                img:setFilter("nearest", "nearest")
+                self.img_obj = img
+                self.orig_img_obj = img
+            end
+        end
+    end
+
+    function opts:explode()
+        if self.is_exploded then return end
+        self.is_exploded = true
+        self.exploding = true
+        self.explosion_timer = 0.45
+
+        self.orig_image = self.orig_image or self.image
+        self.image = "assets/level3/bookshelf_boom_boom.png"
+        if not self.boom_img_obj then
+            local ok, img = pcall(love.graphics.newImage, self.image)
+            if ok and img then
+                img:setFilter("nearest", "nearest")
+                self.boom_img_obj = img
+            end
+        end
+        if self.boom_img_obj then
+            self.img_obj = self.boom_img_obj
+        end
+
+        local sc = self.scene
+        if sc and sc.shakeCamera then
+            sc:shakeCamera(0.35, 4)
+        end
+
+        local AudioManager = require("src.core.audio_manager")
+        if AudioManager and AudioManager.sfxPlay then
+            AudioManager.sfxPlay("explosion", 1.0, 1.0)
+        end
+
+        local GameState = require("src.core.game_state")
+        if self.has_bomb then
+            local correct = GameState.get("correct_bookshelves_exploded", 0) + 1
+            GameState.set("correct_bookshelves_exploded", correct)
+            if sc and sc.onBombDefused then
+                sc:onBombDefused(self)
+            end
+        else
+            local wrong = GameState.get("wrong_bookshelves_exploded", 0) + 1
+            GameState.set("wrong_bookshelves_exploded", wrong)
+            if sc and sc.onWrongBookshelfExploded then
+                sc:onWrongBookshelfExploded(self, wrong)
+            end
+        end
+    end
+
+    function opts:canInteract(player)
+        if self.is_exploded then return false end
+        local is_down = false
+        if player and player.isHoldingKey then
+            is_down = player:isHoldingKey("down")
+        else
+            is_down = love.keyboard.isDown("down") or love.keyboard.isDown("s")
+        end
+        if is_down then
+            return false
+        end
+        return true
+    end
+
+    function opts:onInteract(down_held, player)
+        local is_down = down_held
+        if is_down == nil then
+            if player and player.isHoldingKey then
+                is_down = player:isHoldingKey("down")
+            else
+                is_down = love.keyboard.isDown("down") or love.keyboard.isDown("s")
+            end
+        end
+        if is_down then
+            return
+        end
+        self:explode()
+    end
+
+    function opts:update(dt)
+        if self.exploding then
+            self.explosion_timer = self.explosion_timer - dt
+            if self.explosion_timer <= 0 then
+                self.exploding = false
+            end
+        end
+    end
+
+    function opts:draw()
+        if self.exploding then
+            if not self.explosion_img then
+                local ok, img = pcall(love.graphics.newImage, "assets/level3/explosion.png")
+                if ok and img then
+                    img:setFilter("nearest", "nearest")
+                    self.explosion_img = img
+                end
+            end
+            if self.explosion_img then
+                local ew, eh = self.explosion_img:getDimensions()
+                local ex = self.x + (self.w - ew) / 2
+                local ey = self.y + (self.h - eh) / 2
+                love.graphics.setColor(1, 1, 1, 1)
+                love.graphics.draw(self.explosion_img, ex, ey)
+            end
+        end
+    end
+
+    self.scene:addElement(opts)
     return self
 end
 

@@ -312,12 +312,13 @@ function AudioManager.setMusicFx(fx_name, fadedur)
     local m = AudioManager.current_music
     local target_fx = (not fx_name or fx_name == "base" or fx_name == "none" or fx_name == false or fx_name == "") and "base" or fx_name
 
-    if m.active_fx == target_fx and not m.fx_fade then
+    -- Check if we are already at this FX or currently fading towards it
+    local current_target = (m.fx_fade and m.fx_fade.to_fx) or m.active_fx
+    if current_target == target_fx then
         return
     end
 
     if not m.variants then return end
-    local cur_variant = m.variants[m.active_fx] or m.variants["base"]
     local next_variant = m.variants[target_fx]
     if not next_variant then
         return
@@ -326,17 +327,29 @@ function AudioManager.setMusicFx(fx_name, fadedur)
     local dur = fadedur or (AudioManager.db and AudioManager.db.default_fade_duration) or 0.5
     dur = math.max(0.01, dur)
 
-    local cur_src = get_variant_source(cur_variant, m.stage)
-    local next_src = get_variant_source(next_variant, m.stage)
+    -- Determine what source is currently audible
+    local cur_variant = nil
+    local cur_src = nil
+    if m.fx_fade then
+        cur_variant = m.fx_fade.to_variant
+        cur_src = m.fx_fade.to_src
+    else
+        cur_variant = m.variants[m.active_fx] or m.variants["base"]
+        cur_src = get_variant_source(cur_variant, m.stage)
+    end
 
+    local next_src = get_variant_source(next_variant, m.stage)
     if not next_src then
         m.active_fx = target_fx
+        m.fx_fade = nil
         return
     end
 
     local pos = 0
     if cur_src and cur_src:isPlaying() then
         pos = cur_src:tell("seconds") or 0
+    elseif m.source and m.source:isPlaying() then
+        pos = m.source:tell("seconds") or 0
     end
 
     local max_dur = next_src:getDuration("seconds") or 0
@@ -372,17 +385,18 @@ function AudioManager.setMusicFx(fx_name, fadedur)
             to_variant = next_variant,
             from_src = cur_src,
             to_src = next_src,
-            from_fx = m.active_fx,
+            from_fx = cur_variant and cur_variant.name or m.active_fx,
             to_fx = target_fx,
             duration = dur,
             timer = 0
         }
+        m.active_fx = target_fx
     end
 end
 
 function AudioManager.getMusicFx()
     if AudioManager.current_music then
-        return AudioManager.current_music.active_fx
+        return (AudioManager.current_music.fx_fade and AudioManager.current_music.fx_fade.to_fx) or AudioManager.current_music.active_fx
     end
     return nil
 end
@@ -453,6 +467,7 @@ function AudioManager.musFadeTo(BGM, vol, fadedur, fx_name)
             duration = dur,
             timer = 0
         }
+        AudioManager.current_music.target_volume = target_vol
         return
     end
 

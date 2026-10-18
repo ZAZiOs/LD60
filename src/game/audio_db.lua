@@ -27,6 +27,20 @@ return {
                 }
             }
         },
+        ["mr_boss"] = {
+            preloop = "assets/mus/mr_boss_intro.ogg",
+            loop = "assets/mus/mr_boss_loop.ogg",
+            volume = 0.8
+        },
+        ["data"] = {
+            preloop = "assets/mus/data_calm_preloop.ogg",
+            loop = "assets/mus/data_calm_loop.ogg",
+            volume = 0.8,
+        },
+        ["data_run"] = {
+            loop = "assets/mus/data_run_loop.ogg",
+            volume = 0.8,
+        },
         ["web_havoc"] = {
             preloop = "assets/mus/web_havoc_preloop.ogg",
             loop = "assets/mus/web_havoc_loop.ogg",
@@ -44,5 +58,11 @@ return {
     --   pitch_variance: number (random variance +/- applied per play)
     -- ========================================================================
     sfx = {
+        ["shutdown"] = {
+            path = "assets/sfx/shutdown.ogg",
+            volume = 0.8,
+            pitch = 1.0,
+            pitch_variance = 0,
+        }
     }
 }

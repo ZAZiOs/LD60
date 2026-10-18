@@ -56,7 +56,9 @@ function PixelWindow.new(opts)
     self.is_window = true
     self.clickable = (opts.clickable ~= false)
     self.is_solid = (opts.is_solid == true)
-    self.z_index = opts.z_index or 100
+    self.fixed = (opts.fixed == true)
+    self.scene = opts.scene
+    self.z_index = opts.z_index or (self.fixed and 1050 or 100)
 
     self.closeable = (opts.closeable ~= false)
     self.draggable = (opts.draggable ~= false)
@@ -492,22 +494,26 @@ function PixelWindow:draw()
     drawPart(sheet, "border_bottom", x + 2, y + h - 2, w - 4, 1)
     drawPart(sheet, "corner_br", x + w - 2, y + h - 2, 1, 1)
 
-    local font = self:_getFont()
-    if font and self.title and self.title ~= "" then
-        love.graphics.setFont(font)
-        love.graphics.setColor(1, 1, 1, 1)
-        local title_limit = self.closeable and (w - 14) or (w - 6)
-        local old_sx, old_sy, old_sw, old_sh = love.graphics.getScissor()
-        love.graphics.setScissor(x + 4, y, title_limit, 10)
-        love.graphics.print(self.title, x + 4, y)
-        love.graphics.setScissor(old_sx, old_sy, old_sw, old_sh)
-    end
-
     self:_renderCanvas()
 
     if self.canvas then
         love.graphics.setColor(1, 1, 1, 1)
         love.graphics.draw(self.canvas, x + 4, y + 12)
+    end
+
+    local font = self:_getFont()
+    if font and self.title and self.title ~= "" then
+        love.graphics.setFont(font)
+        love.graphics.setColor(1, 1, 1, 1)
+        local title_limit = self.closeable and (w - 14) or (w - 6)
+        local cam_x = (not self.fixed and self.scene and self.scene.camera and self.scene.camera.x) or 0
+        local cam_y = (not self.fixed and self.scene and self.scene.camera and self.scene.camera.y) or 0
+        local sx = math.floor(x + 4 - cam_x)
+        local sy = math.floor(y - cam_y)
+        local old_sx, old_sy, old_sw, old_sh = love.graphics.getScissor()
+        love.graphics.setScissor(sx, sy, title_limit, 10)
+        love.graphics.print(self.title, x + 4, y)
+        love.graphics.setScissor(old_sx, old_sy, old_sw, old_sh)
     end
 
     if self.max_scroll > 0 then
@@ -613,8 +619,10 @@ function PixelWindow:mousemoved(gx, gy, gdx, gdy)
     if self.dragging then
         self.x = math.floor(gx - self.drag_offset_x)
         self.y = math.floor(gy - self.drag_offset_y)
-        self.x = math.max(-self.w + 20, math.min(300, self.x))
-        self.y = math.max(0, math.min(214, self.y))
+        local max_w = self.fixed and 300 or ((self.scene and self.scene.room_width and (self.scene.room_width - 20)) or 300)
+        local max_h = self.fixed and 214 or ((self.scene and self.scene.room_height and (self.scene.room_height - 26)) or 214)
+        self.x = math.max(-self.w + 20, math.min(max_w, self.x))
+        self.y = math.max(0, math.min(max_h, self.y))
     elseif self.dragging_scrollbar and self.max_scroll > 0 then
         local sb_y = self.y + 12
         local sb_h = self.inner_h

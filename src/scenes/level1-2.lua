@@ -282,7 +282,7 @@ local Level1Scene = GameScene.new({
         Effects.drawCrt(s.canvas, s.x, s.y, s.scale_x, s.scale_y)
     end,
     enter = function(self)
-        AudioManager.musFadeTo("cat", 0.5, 0.5, "reverb")
+        AudioManager.musFadeTo("cat", 0.2, 0.5, "reverb")
 
         -- If already completed, restore state
         if GameState.get("level1_2_door_opened") then

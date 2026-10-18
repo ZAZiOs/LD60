@@ -125,7 +125,23 @@ function PixelScene:addElement(elem)
 
     if not elem.getCollisionBoxes then
         elem.getCollisionBoxes = function(self)
-            if self.collisions and #self.collisions > 0 then
+            if self.is_taskbar or self.id == "taskbar" then
+                local rw = (self.scene and self.scene.room_width) or 320
+                local rh = (self.scene and self.scene.room_height) or 240
+                return { {
+                    x = 0,
+                    y = self.y or (rh - 16),
+                    w = rw,
+                    h = self.h or 16,
+                    one_way = false,
+                    is_one_way = false,
+                    top_only = false
+                } }
+            elseif self.collisions and #self.collisions > 0 then
+                local cam_x = (self.scene and self.scene.camera and self.scene.camera.x) or 0
+                local cam_y = (self.scene and self.scene.camera and self.scene.camera.y) or 0
+                local base_x = self.fixed and (self.x + cam_x) or self.x
+                local base_y = self.fixed and (self.y + cam_y) or self.y
                 local boxes = {}
                 for _, c in ipairs(self.collisions) do
                     local is_rel = (c.relative ~= false and c.is_relative ~= false and not c.absolute)
@@ -133,8 +149,8 @@ function PixelScene:addElement(elem)
                     local cy = c.y or c[2] or 0
                     local cw = c.w or c[3] or self.w
                     local ch = c.h or c[4] or self.h
-                    local bx = is_rel and (self.x + cx) or cx
-                    local by = is_rel and (self.y + cy) or cy
+                    local bx = is_rel and (base_x + cx) or cx
+                    local by = is_rel and (base_y + cy) or cy
                     local one_way = (c.one_way == true or c.top_only == true or c.is_one_way == true or self.is_one_way == true or self.one_way == true or self.top_only == true)
                     table.insert(boxes, {
                         x = bx,
@@ -148,10 +164,14 @@ function PixelScene:addElement(elem)
                 end
                 return boxes
             else
+                local cam_x = (self.scene and self.scene.camera and self.scene.camera.x) or 0
+                local cam_y = (self.scene and self.scene.camera and self.scene.camera.y) or 0
+                local base_x = self.fixed and (self.x + cam_x) or self.x
+                local base_y = self.fixed and (self.y + cam_y) or self.y
                 local one_way = (self.is_one_way == true or self.one_way == true or self.top_only == true)
                 return { {
-                    x = self.x,
-                    y = self.y,
+                    x = base_x,
+                    y = base_y,
                     w = self.w,
                     h = self.h,
                     one_way = one_way,
@@ -164,12 +184,15 @@ function PixelScene:addElement(elem)
 
     if elem.is_window then
         elem.z_index = elem.z_index or 100
-    elseif elem.is_taskbar or elem.id == "taskbar" or (type(elem.id) == "string" and elem.id:match("^taskbar")) then
+    elseif elem.is_taskbar or elem.id == "taskbar" then
         elem.is_taskbar = true
+        elem.fixed = true
         elem.z_index = elem.z_index or 1000
         if elem.clickable == nil then elem.clickable = true end
         if elem.onClick == nil then elem.onClick = function() return true end end
     elseif elem.is_tab then
+        elem.is_tab = true
+        elem.fixed = true
         elem.z_index = elem.z_index or 1010
     end
 
@@ -242,6 +265,9 @@ function PixelScene:setElementActive(id, active)
     end
 end
 
+PixelScene.setVisible = PixelScene.setElementVisible
+PixelScene.setActive = PixelScene.setElementActive
+
 
 function PixelScene:enter(...)
     if self.on_enter_fn then
@@ -276,10 +302,15 @@ end
 
 function PixelScene:getHoveredElement()
     if not self.mouse_inside then return nil end
+    local cam_x = (self.camera and self.camera.x) or 0
+    local cam_y = (self.camera and self.camera.y) or 0
+
     for i = #self.elements, 1, -1 do
         local el = self.elements[i]
         if el.visible and el.clickable then
-            if self.mouse_gx >= el.x and self.mouse_gx < el.x + el.w and self.mouse_gy >= el.y and self.mouse_gy < el.y + el.h then
+            local mx = el.fixed and self.mouse_gx or (self.mouse_gx + cam_x)
+            local my = el.fixed and self.mouse_gy or (self.mouse_gy + cam_y)
+            if mx >= el.x and mx < el.x + el.w and my >= el.y and my < el.y + el.h then
                 if el.is_taskbar or el.is_window or not elementCanInteract(el, self.player) then
                     return nil
                 end
@@ -292,13 +323,17 @@ end
 
 function PixelScene:getInteractableElement()
     if not self.player then return nil end
+    local cam_x = (self.camera and self.camera.x) or 0
+    local cam_y = (self.camera and self.camera.y) or 0
     local best_el = nil
     local best_dist = math.huge
     for _, el in ipairs(self.elements) do
         if el.visible and not el.is_window and not el.is_taskbar and elementCanInteract(el, self.player) and (el.onInteract or el.interactable or (el.clickable and el.onClick)) then
             if self.player:canInteractWith(el) then
-                local ecx = el.x + el.w / 2
-                local ecy = el.y + el.h / 2
+                local el_world_x = el.fixed and (el.x + cam_x) or el.x
+                local el_world_y = el.fixed and (el.y + cam_y) or el.y
+                local ecx = el_world_x + el.w / 2
+                local ecy = el_world_y + el.h / 2
                 local pcx = self.player.x
                 local pcy = self.player.y - (self.player.box_h or 24) / 2
                 local dist = (ecx - pcx) * (ecx - pcx) + (ecy - pcy) * (ecy - pcy)
@@ -324,8 +359,8 @@ function PixelScene:updateCamera(dt)
     local cam_h = 240
     
     -- Deadzone settings
-    local deadzone_w = 120
-    local deadzone_h = 60
+    local deadzone_w = self.camera_deadzone_w or 100
+    local deadzone_h = self.camera_deadzone_h or 60
     local deadzone_x = self.camera.x + (cam_w - deadzone_w) / 2
     local deadzone_y = self.camera.y + (cam_h - deadzone_h) / 2
     
@@ -350,15 +385,29 @@ function PixelScene:updateCamera(dt)
     targetX = math.max(0, math.min(targetX, max_cam_x))
     targetY = math.max(0, math.min(targetY, max_cam_y))
     
-    -- Smoothing
-    local speed = 1000
+    -- Smooth exponential follow
+    local speed = self.camera_speed or 12
     local t = 1 - math.exp(-speed * dt)
     
     self.camera.x = self.camera.x + (targetX - self.camera.x) * t
     self.camera.y = self.camera.y + (targetY - self.camera.y) * t
     
-    self.camera.x = math.floor(self.camera.x)
-    self.camera.y = math.floor(self.camera.y)
+    self.camera.x = math.floor(self.camera.x + 0.5)
+    self.camera.y = math.floor(self.camera.y + 0.5)
+
+    if self.cam_shake_timer and self.cam_shake_timer > 0 then
+        self.cam_shake_timer = math.max(0, self.cam_shake_timer - dt)
+        local mag = self.cam_shake_mag or 2
+        local shake_x = math.floor((math.random() * 2 - 1) * mag + 0.5)
+        local shake_y = math.floor((math.random() * 2 - 1) * mag + 0.5)
+        self.camera.x = self.camera.x + shake_x
+        self.camera.y = self.camera.y + shake_y
+    end
+end
+
+function PixelScene:shakeCamera(duration, magnitude)
+    self.cam_shake_timer = duration or 0.3
+    self.cam_shake_mag = magnitude or 3
 end
 
 function PixelScene:update(dt)
@@ -382,15 +431,47 @@ function PixelScene:update(dt)
     self.current_interactable = self:getInteractableElement()
 end
 
+function PixelScene:drawElement(el, shader)
+    local current_img = (el.is_active and el.active_img_obj) or el.img_obj
+    if self:canInteractWith(el) then
+        if current_img and shader then
+            love.graphics.setShader(shader)
+            love.graphics.setColor(1, 1, 1, 1)
+            for i = 1, 8 do
+                local off = OUTLINE_OFFSETS[i]
+                love.graphics.draw(current_img, el.x + off[1], el.y + off[2])
+            end
+            love.graphics.setShader()
+        elseif el.w and el.h and el.w > 0 and el.h > 0 then
+            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.rectangle("fill", el.x - 1, el.y - 1, el.w + 2, 1)
+            love.graphics.rectangle("fill", el.x - 1, el.y + el.h, el.w + 2, 1)
+            love.graphics.rectangle("fill", el.x - 1, el.y, 1, el.h)
+            love.graphics.rectangle("fill", el.x + el.w, el.y, 1, el.h)
+        end
+    end
+
+    love.graphics.setColor(1, 1, 1, 1)
+    if current_img then
+        love.graphics.draw(current_img, el.x, el.y)
+    end
+    if el.draw then
+        el:draw()
+    end
+end
+
 function PixelScene:draw()
-    if self.camera and (self.camera.x ~= 0 or self.camera.y ~= 0) then
+    local cam_x = (self.camera and self.camera.x) or 0
+    local cam_y = (self.camera and self.camera.y) or 0
+
+    if self.camera and (cam_x ~= 0 or cam_y ~= 0) then
         love.graphics.push()
-        love.graphics.translate(-self.camera.x, -self.camera.y)
+        love.graphics.translate(-cam_x, -cam_y)
     end
 
     if self.bg_color then
         love.graphics.setColor(self.bg_color[1], self.bg_color[2], self.bg_color[3], self.bg_color[4] or 1)
-        love.graphics.rectangle("fill", 0, 0, 320, 240)
+        love.graphics.rectangle("fill", 0, 0, self.room_width or 320, self.room_height or 240)
     end
 
     if self.bg_image then
@@ -400,33 +481,8 @@ function PixelScene:draw()
 
     local shader = getOutlineShader()
     for _, el in ipairs(self.elements) do
-        if el.visible then
-            local current_img = (el.is_active and el.active_img_obj) or el.img_obj
-            if self:canInteractWith(el) then
-                if current_img and shader then
-                    love.graphics.setShader(shader)
-                    love.graphics.setColor(1, 1, 1, 1)
-                    for i = 1, 8 do
-                        local off = OUTLINE_OFFSETS[i]
-                        love.graphics.draw(current_img, el.x + off[1], el.y + off[2])
-                    end
-                    love.graphics.setShader()
-                elseif el.w and el.h and el.w > 0 and el.h > 0 then
-                    love.graphics.setColor(1, 1, 1, 1)
-                    love.graphics.rectangle("fill", el.x - 1, el.y - 1, el.w + 2, 1)
-                    love.graphics.rectangle("fill", el.x - 1, el.y + el.h, el.w + 2, 1)
-                    love.graphics.rectangle("fill", el.x - 1, el.y, 1, el.h)
-                    love.graphics.rectangle("fill", el.x + el.w, el.y, 1, el.h)
-                end
-            end
-
-            love.graphics.setColor(1, 1, 1, 1)
-            if current_img then
-                love.graphics.draw(current_img, el.x, el.y)
-            end
-            if el.draw then
-                el:draw()
-            end
+        if el.visible and not el.fixed then
+            self:drawElement(el, shader)
         end
     end
 
@@ -440,7 +496,7 @@ function PixelScene:draw()
 
     if DEBUG then
         for _, el in ipairs(self.elements) do
-            if el.visible and el.is_solid then
+            if el.visible and el.is_solid and not el.fixed then
                 local boxes = el.getCollisionBoxes and el:getCollisionBoxes() or { { x = el.x, y = el.y, w = el.w, h = el.h } }
                 for _, b in ipairs(boxes) do
                     if b.one_way then
@@ -464,8 +520,15 @@ function PixelScene:draw()
         love.graphics.setColor(1, 1, 1, 1)
     end
 
-    if self.camera and (self.camera.x ~= 0 or self.camera.y ~= 0) then
+    if self.camera and (cam_x ~= 0 or cam_y ~= 0) then
         love.graphics.pop()
+    end
+
+    -- Fixed elements (HUD, taskbar at fixed bottom: 0, tabs)
+    for _, el in ipairs(self.elements) do
+        if el.visible and el.fixed then
+            self:drawElement(el, shader)
+        end
     end
 
     if self.show_cursor and self.mouse_inside and self.cursor_sheet then
@@ -475,15 +538,20 @@ function PixelScene:draw()
 end
 
 function PixelScene:mousepressed(gx, gy, button, istouch, presses)
+    local cam_x = (self.camera and self.camera.x) or 0
+    local cam_y = (self.camera and self.camera.y) or 0
+
     for i = #self.elements, 1, -1 do
         local el = self.elements[i]
         if el.visible and el.clickable then
-            if gx >= el.x and gx < el.x + el.w and gy >= el.y and gy < el.y + el.h then
+            local mx = el.fixed and gx or (gx + cam_x)
+            local my = el.fixed and gy or (gy + cam_y)
+            if mx >= el.x and mx < el.x + el.w and my >= el.y and my < el.y + el.h then
                 if el.is_window then
                     self:bringToFront(el.id)
                 end
                 if el.mousepressed then
-                    local handled = el:mousepressed(gx, gy, button)
+                    local handled = el:mousepressed(mx, my, button)
                     if handled ~= false then
                         return true
                     end
@@ -501,10 +569,15 @@ function PixelScene:mousepressed(gx, gy, button, istouch, presses)
 end
 
 function PixelScene:mousereleased(gx, gy, button, istouch, presses)
+    local cam_x = (self.camera and self.camera.x) or 0
+    local cam_y = (self.camera and self.camera.y) or 0
+
     for i = #self.elements, 1, -1 do
         local el = self.elements[i]
         if el.visible and el.mousereleased then
-            el:mousereleased(gx, gy, button)
+            local mx = el.fixed and gx or (gx + cam_x)
+            local my = el.fixed and gy or (gy + cam_y)
+            el:mousereleased(mx, my, button)
         end
     end
 
@@ -522,10 +595,15 @@ function PixelScene:mousemoved(gx, gy, gdx, gdy, istouch, inside)
         love.mouse.setVisible(not inside)
     end
 
+    local cam_x = (self.camera and self.camera.x) or 0
+    local cam_y = (self.camera and self.camera.y) or 0
+
     for i = #self.elements, 1, -1 do
         local el = self.elements[i]
         if el.visible and el.mousemoved then
-            el:mousemoved(gx, gy, gdx, gdy)
+            local mx = el.fixed and gx or (gx + cam_x)
+            local my = el.fixed and gy or (gy + cam_y)
+            el:mousemoved(mx, my, gdx, gdy)
         end
     end
 
@@ -535,11 +613,16 @@ function PixelScene:mousemoved(gx, gy, gdx, gdy, istouch, inside)
 end
 
 function PixelScene:wheelmoved(x, y)
+    local cam_x = (self.camera and self.camera.x) or 0
+    local cam_y = (self.camera and self.camera.y) or 0
+
     if self.mouse_inside then
         for i = #self.elements, 1, -1 do
             local el = self.elements[i]
             if el.visible and el.wheelmoved then
-                if self.mouse_gx >= el.x and self.mouse_gx < el.x + el.w and self.mouse_gy >= el.y and self.mouse_gy < el.y + el.h then
+                local mx = el.fixed and self.mouse_gx or (self.mouse_gx + cam_x)
+                local my = el.fixed and self.mouse_gy or (self.mouse_gy + cam_y)
+                if mx >= el.x and mx < el.x + el.w and my >= el.y and my < el.y + el.h then
                     local handled = el:wheelmoved(x, y)
                     if handled ~= false then
                         return

@@ -33,11 +33,10 @@ function love.load(args)
     SceneManager.register("level1-2", "src.scenes.level1-2")
     SceneManager.register("level2", "src.scenes.level2")
     SceneManager.register("level3", "src.scenes.level3")
-    SceneManager.register("level4", "src.scenes.level4")
-
-    if DEBUG then
-        SceneManager.register("test_camera", "src.scenes.test_camera") 
-    end
+    SceneManager.register("level4", "src.scenes.the_end_scene")
+    SceneManager.register("the_end", "src.scenes.the_end_scene")
+    SceneManager.register("gameover", "src.scenes.gameover")
+    SceneManager.register("soundcheck", "src.scenes.soundcheck")
 
     SceneManager.goTo("menu")
 end
@@ -74,7 +73,7 @@ function love.keypressed(key, scancode, isrepeat)
     if DEBUG then
         local current = SceneManager.getCurrentName()
         -- Rooms for debug
-        local debug_rooms = { "menu", "test_camera", "level0", "level1", "level1-2", "level2", "level3", "level4" }
+        local debug_rooms = { "menu", "soundcheck", "level0", "level1", "level1-2", "level2", "level3", "level4" }
         
         -- Current index
         local current_index = 1
