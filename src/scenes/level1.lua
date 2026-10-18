@@ -110,7 +110,12 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
                     self.img_obj = img
                 end
                 GameState.set("level1_chest_opened", true)
-                self.scene:getElement("crowbar").visible = true
+                if not GameState.get("level1_crowbar_collected") then
+                    self.scene:getElement("crowbar").visible = true
+                end
+                if not GameState.get("level1_note_collected") then
+                    self.scene:getElement("note").visible = true
+                end
             end
         end
     })
@@ -135,14 +140,29 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
         z_index = -2,
     })
     :addElement({
-        id = "crowbar",
-        image = "assets/level1/fomka.png",
+        id = "note",
+        image = "assets/level1/note.png",
         x = 60,
         y = 160,
-        z_index = -2,
+        z_index = 0,
         visible = false,
         onInteract = function(self)
-            if GameState.get("level1_chest_opened", false) then
+            if GameState.get("level1_chest_opened") then
+                GameState.set("level1_note_collected", true)
+                self.visible = false
+                self.scene:getElement("tab_text").visible = true
+            end
+        end
+    })
+    :addElement({
+        id = "crowbar",
+        image = "assets/level1/fomka.png",
+        x = 20,
+        y = 160,
+        z_index = 0,
+        visible = false,
+        onInteract = function(self)
+            if GameState.get("level1_chest_opened") then
                 GameState.set("level1_crowbar_collected", true)
                 self.visible = false
             end
@@ -154,6 +174,7 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
         active = "assets/level1/tab_text_a.png",
         x = 40,
         y = 226,
+        visible = false,
         onClick = function(self)
             self.scene:toggleElement("window_text")
             local win = self.scene:getElement("window_text")
@@ -169,8 +190,8 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
         y = 40,
         w = 180,
         h = 120,
+        z_index = 50,
         visible = false,
-        is_solid = true,
         text = [[October 17
 
 Meow meow :3
