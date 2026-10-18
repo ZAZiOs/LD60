@@ -192,9 +192,10 @@ function PixelScreen:mousemoved(vx, vy, vdx, vdy, istouch)
     local gx, gy = self:toGame(vx, vy)
     local gdx = vdx / self.scale_x
     local gdy = vdy / self.scale_y
-    if inside then
+    if inside or self._was_inside then
         self.needs_render = true
     end
+    self._was_inside = inside
     if self.game and self.game.mousemoved then
         self.game:mousemoved(gx, gy, gdx, gdy, istouch, inside)
     end

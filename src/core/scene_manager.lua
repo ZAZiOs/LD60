@@ -12,7 +12,17 @@ local SceneManager = {
     transition = nil
 }
 
-local DEFAULT_FADE_COLOR = { 0x2D / 255, 0x37 / 255, 0x42 / 255 }
+local fade_canvas = nil
+local function getFadeCanvas()
+    local w = Viewport.getWidth()
+    local h = Viewport.getHeight()
+    if not fade_canvas or fade_canvas:getWidth() ~= w or fade_canvas:getHeight() ~= h then
+        if fade_canvas then fade_canvas:release() end
+        fade_canvas = love.graphics.newCanvas(w, h)
+        fade_canvas:setFilter("nearest", "nearest")
+    end
+    return fade_canvas
+end
 
 function SceneManager.register(name, scene)
     assert(type(name) == "string", "Scene name must be a string")
@@ -60,11 +70,52 @@ end
 
 SceneManager.switch = SceneManager.goTo
 
-function SceneManager.fadeTo(name, duration, color, ...)
-    local dur = duration or 1.0
-    local col = color or DEFAULT_FADE_COLOR
+function SceneManager.crossFade(name, duration, ...)
+    local dur = duration or 0.5
+
+    local target = SceneManager._resolveTarget(name)
+
+    local canvas = getFadeCanvas()
+    love.graphics.push("all")
+    love.graphics.setCanvas(canvas)
+    love.graphics.origin()
+    love.graphics.clear(0, 0, 0, 0)
+    if SceneManager.current_scene and SceneManager.current_scene.screen then
+        SceneManager.current_scene.screen.needs_render = true
+    end
+    if SceneManager.current_scene and SceneManager.current_scene.draw then
+        SceneManager.current_scene:draw()
+    end
+    love.graphics.pop()
+
+    if SceneManager.current_scene and SceneManager.current_scene.leave then
+        SceneManager.current_scene:leave()
+    end
+
+    SceneManager.previous_name = SceneManager.current_name
+    SceneManager.current_name = name
+    SceneManager.current_scene = target
+    SceneManager.current = target
+
+    if SceneManager.current_scene and SceneManager.current_scene.enter then
+        SceneManager.current_scene:enter(...)
+    end
 
     SceneManager.transition = {
+        type = "crossfade",
+        timer = 0,
+        duration = math.max(0.01, dur),
+        canvas = canvas,
+        has_drawn = false
+    }
+end
+
+function SceneManager._fadeColor(name, duration, color, ...)
+    local dur = duration or 0.5
+    local col = color or { 0, 0, 0 }
+
+    SceneManager.transition = {
+        type = "color",
         state = "fade_out",
         timer = 0,
         half_duration = math.max(0.01, dur / 2),
@@ -72,6 +123,15 @@ function SceneManager.fadeTo(name, duration, color, ...)
         target_name = name,
         target_args = { ... }
     }
+end
+
+function SceneManager.fadeTo(name, duration, color, ...)
+    local dur = duration or 0.5
+    if type(color) == "table" then
+        SceneManager._fadeColor(name, dur, color, ...)
+    else
+        SceneManager.crossFade(name, dur, ...)
+    end
 end
 
 function SceneManager.isTransitioning()
@@ -97,17 +157,27 @@ function SceneManager.update(dt)
 
     if SceneManager.transition then
         local t = SceneManager.transition
-        t.timer = t.timer + dt
+        if not t.has_drawn then
+            return
+        end
+        local step = math.min(dt, 0.033)
+        t.timer = t.timer + step
 
-        if t.state == "fade_out" then
-            if t.timer >= t.half_duration then
-                SceneManager._switchScene(t.target_name, unpack_fn(t.target_args))
-                t.state = "fade_in"
-                t.timer = 0
-            end
-        elseif t.state == "fade_in" then
-            if t.timer >= t.half_duration then
+        if t.type == "crossfade" then
+            if t.timer >= t.duration then
                 SceneManager.transition = nil
+            end
+        elseif t.type == "color" then
+            if t.state == "fade_out" then
+                if t.timer >= t.half_duration then
+                    SceneManager._switchScene(t.target_name, unpack_fn(t.target_args))
+                    t.state = "fade_in"
+                    t.timer = 0
+                end
+            elseif t.state == "fade_in" then
+                if t.timer >= t.half_duration then
+                    SceneManager.transition = nil
+                end
             end
         end
     end
@@ -120,25 +190,37 @@ function SceneManager.draw()
 
     if SceneManager.transition then
         local t = SceneManager.transition
-        local alpha = 0
+        t.has_drawn = true
 
-        if t.state == "fade_out" then
-            alpha = math.min(1, t.timer / t.half_duration)
-        elseif t.state == "fade_in" then
-            alpha = math.max(0, 1.0 - (t.timer / t.half_duration))
-        end
+        if t.type == "crossfade" and t.canvas then
+            local p = math.min(1.0, t.timer / t.duration)
+            local alpha = 0.5 + 0.5 * math.cos(p * math.pi)
+            if alpha > 0.001 then
+                love.graphics.setColor(1, 1, 1, alpha)
+                love.graphics.draw(t.canvas, 0, 0)
+            end
+        elseif t.type == "color" then
+            local alpha = 0
+            if t.state == "fade_out" then
+                local p = math.min(1.0, t.timer / t.half_duration)
+                alpha = 0.5 - 0.5 * math.cos(p * math.pi)
+            elseif t.state == "fade_in" then
+                local p = math.min(1.0, t.timer / t.half_duration)
+                alpha = 0.5 + 0.5 * math.cos(p * math.pi)
+            end
 
-        if alpha > 0 then
-            local w = Viewport.getWidth()
-            local h = Viewport.getHeight()
-            love.graphics.setColor(t.color[1], t.color[2], t.color[3], alpha)
-            love.graphics.rectangle("fill", 0, 0, w, h)
+            if alpha > 0.001 then
+                local w = Viewport.getWidth()
+                local h = Viewport.getHeight()
+                love.graphics.setColor(t.color[1], t.color[2], t.color[3], alpha)
+                love.graphics.rectangle("fill", 0, 0, w, h)
+            end
         end
     end
 end
 
 function SceneManager.mousepressed(x, y, button, istouch, presses)
-    if SceneManager.isTransitioning() and SceneManager.transition.state == "fade_out" then
+    if SceneManager.isTransitioning() then
         return
     end
     if SceneManager.current_scene and SceneManager.current_scene.mousepressed then
@@ -147,7 +229,7 @@ function SceneManager.mousepressed(x, y, button, istouch, presses)
 end
 
 function SceneManager.mousereleased(x, y, button, istouch, presses)
-    if SceneManager.isTransitioning() and SceneManager.transition.state == "fade_out" then
+    if SceneManager.isTransitioning() then
         return
     end
     if SceneManager.current_scene and SceneManager.current_scene.mousereleased then
@@ -168,7 +250,7 @@ function SceneManager.wheelmoved(x, y)
 end
 
 function SceneManager.keypressed(key, scancode, isrepeat)
-    if SceneManager.isTransitioning() and SceneManager.transition.state == "fade_out" then
+    if SceneManager.isTransitioning() then
         return
     end
     if SceneManager.current_scene and SceneManager.current_scene.keypressed then
