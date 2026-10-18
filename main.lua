@@ -40,8 +40,7 @@ function love.load(args)
     SceneManager.register("soundcheck", "src.scenes.soundcheck")
 
     if DEBUG then
-        SceneManager.goTo("level1-3")
-        return
+        SceneManager.register("test_camera", "src.scenes.test_camera")
     end
 
     SceneManager.goTo("menu")
