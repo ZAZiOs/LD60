@@ -4,6 +4,9 @@ local GameScene = require("src.core.game_scene")
 local Effects = require("src.core.effects")
 local I18n = require("src.core.i18n")
 local SpritesheetManager = require("src.core.spritesheet_manager")
+local AudioManager = require("src.core.audio_manager")
+
+local menu_has_booted = false
 
 local font_title = nil
 local font_bold = nil
@@ -54,18 +57,30 @@ local menu_content = {
     cursor_frame = "cursor",
     mouse_gx = 0,
     mouse_gy = 0,
-    mouse_inside = false
+    mouse_inside = false,
+
+    power_state = "off",     -- "off" | "powering_on" | "on"
+    power_timer = 0,
+    power_duration = 0.32
 }
 
 function menu_content:refreshOptions()
-    local start_text = "Start Game"
+    local start_text = "run"
 
-    local quit_text = "Quit"
+    local quit_text = "exit"
 
     self.options = {
         { id = "start", text = start_text },
         { id = "quit",  text = quit_text }
     }
+end
+
+function menu_content:turnOn()
+    if self.power_state ~= "off" then return end
+    self.power_state = "powering_on"
+    self.power_timer = 0
+    menu_has_booted = true
+    AudioManager.musPlay("crt")
 end
 
 function menu_content:enter()
@@ -78,6 +93,15 @@ function menu_content:enter()
     if not self.cursor_sheet then
         self.cursor_sheet = SpritesheetManager.getSheet("assets/cursor.ini")
     end
+
+    if menu_has_booted then
+        self.power_state = "on"
+        AudioManager.musPlay("crt")
+    else
+        self.power_state = "off"
+        self.power_timer = 0
+    end
+
     if love and love.mouse then
         love.mouse.setVisible(true)
     end
@@ -93,6 +117,13 @@ end
 
 function menu_content:update(dt)
     self.blink_timer = self.blink_timer + dt
+
+    if self.power_state == "powering_on" then
+        self.power_timer = self.power_timer + dt
+        if self.power_timer >= self.power_duration then
+            self.power_state = "on"
+        end
+    end
 end
 
 function menu_content:selectNext()
@@ -113,13 +144,20 @@ function menu_content:confirm()
     local opt = self.options[self.selected]
     if not opt then return end
     if opt.id == "start" then
-        SceneManager.crossFade("level0", 0.2)
+        SceneManager.goTo("level0")
     elseif opt.id == "quit" then
         love.event.quit()
     end
 end
 
 function menu_content:keypressed(key)
+    if self.power_state == "off" then
+        self:turnOn()
+        return
+    elseif self.power_state == "powering_on" then
+        return
+    end
+
     if key == "up" or key == "w" then
         self:selectPrev()
     elseif key == "down" or key == "s" then
@@ -136,6 +174,13 @@ function menu_content:mousemoved(gx, gy, gdx, gdy, istouch, inside)
     self.mouse_gx = gx
     self.mouse_gy = gy
     self.mouse_inside = inside
+
+    if self.power_state ~= "on" then
+        if love and love.mouse then
+            love.mouse.setVisible(true)
+        end
+        return
+    end
 
     if love and love.mouse then
         love.mouse.setVisible(not inside)
@@ -155,6 +200,13 @@ function menu_content:mousemoved(gx, gy, gdx, gdy, istouch, inside)
 end
 
 function menu_content:mousepressed(gx, gy, button)
+    if self.power_state == "off" then
+        self:turnOn()
+        return true
+    elseif self.power_state == "powering_on" then
+        return true
+    end
+
     if button == 1 then
         for i, b in ipairs(self.item_bounds) do
             if gx >= b.x and gx <= b.x + b.w and gy >= b.y and gy <= b.y + b.h then
@@ -178,7 +230,7 @@ function menu_content:draw()
     local f_reg = getRegularFont()
 
     love.graphics.setFont(f_title)
-    local title = "tech_plague"
+    local title = "mr_havoc"
     local tw = f_title:getWidth(title)
     love.graphics.setColor(0.92, 0.95, 1, 1)
     love.graphics.print(title, math.floor((320 - tw) / 2), 32)
@@ -213,7 +265,7 @@ function menu_content:draw()
             love.graphics.setColor(0.4, 0.7, 1.0, 1)
             love.graphics.rectangle("line", item_x, item_y, item_w, item_h)
 
-            local prefix = "  "
+            local prefix = "> "
             love.graphics.setColor(1, 1, 1, 1)
             love.graphics.print(prefix .. opt.text, item_x + 10, item_y + 5)
         else
@@ -261,7 +313,87 @@ local MenuScene = GameScene.new({
     bg = bg_path,
     screen = screen,
     screen_draw_fn = function(s)
-        Effects.drawCrt(s.canvas, s.x, s.y, s.scale_x, s.scale_y)
+        if menu_content.power_state == "off" then
+            love.graphics.setColor(0.02, 0.03, 0.04, 1)
+            love.graphics.rectangle("fill", s.x, s.y, s.w, s.h)
+
+            local alpha = 0.35 + 0.35 * math.sin(menu_content.blink_timer * 4)
+            love.graphics.setColor(0.4, 0.65, 0.85, alpha)
+            local f = getBoldFont()
+            love.graphics.setFont(f)
+            local txt = "[ CLICK TO POWER ON ]"
+            local scale = 3
+            local tw = f:getWidth(txt) * scale
+            local th = f:getHeight() * scale
+            love.graphics.print(txt, s.x + math.floor((s.w - tw) / 2), s.y + math.floor((s.h - th) / 2), 0, scale, scale)
+
+        elseif menu_content.power_state == "powering_on" then
+            local t = menu_content.power_timer
+            local dur = menu_content.power_duration
+
+            local t_beam = 0.08
+            if t < t_beam then
+                -- Phase 1: Horizontal beam flaring out from center
+                local p = t / t_beam
+                local p_eased = 1 - (1 - p) * (1 - p)
+
+                local cx = s.x + s.w / 2
+                local cy = s.y + s.h / 2
+                local beam_w = math.max(8, s.w * p_eased)
+
+                love.graphics.setColor(0.02, 0.03, 0.04, 1)
+                love.graphics.rectangle("fill", s.x, s.y, s.w, s.h)
+
+                -- Outer cyan glow
+                love.graphics.setColor(0.3, 0.75, 1.0, 0.6)
+                love.graphics.rectangle("fill", cx - beam_w / 2, cy - 4, beam_w, 8)
+
+                -- Inner bright white core
+                love.graphics.setColor(1, 1, 1, 1)
+                love.graphics.rectangle("fill", cx - beam_w / 2, cy - 1, beam_w, 2)
+
+                -- Central bright spark
+                local spot_r = 5 * (1 - p) + 1
+                love.graphics.circle("fill", cx, cy, spot_r)
+
+            else
+                -- Phase 2: Vertical expansion of the CRT screen
+                local p = (t - t_beam) / (dur - t_beam)
+                p = math.min(1.0, p)
+                local p_eased = 1 - (1 - p) * (1 - p) * (1 - p)
+
+                local cur_h = math.max(6, s.h * p_eased)
+                local cur_y = (s.y + s.h / 2) - cur_h / 2
+                local cur_scale_y = (cur_h / s.h) * s.scale_y
+
+                -- Dark background behind expanding screen
+                love.graphics.setColor(0.02, 0.03, 0.04, 1)
+                love.graphics.rectangle("fill", s.x, s.y, s.w, s.h)
+
+                -- Draw compressed canvas through CRT shader
+                Effects.drawCrt(s.canvas, s.x, cur_y, s.scale_x, cur_scale_y)
+
+                -- Intense white/blue phosphor bloom flash
+                local flash_alpha = (1.0 - p) * (1.0 - p) * 0.95
+                if flash_alpha > 0.01 then
+                    love.graphics.setBlendMode("add")
+                    love.graphics.setColor(0.75, 0.9, 1.0, flash_alpha)
+                    love.graphics.rectangle("fill", s.x, cur_y, s.w, cur_h)
+
+                    -- Center horizontal line
+                    love.graphics.setColor(1, 1, 1, flash_alpha * 0.8)
+                    love.graphics.rectangle("fill", s.x, s.y + s.h / 2 - 1, s.w, 2)
+                    love.graphics.setBlendMode("alpha")
+                end
+            end
+        else
+            Effects.drawCrt(s.canvas, s.x, s.y, s.scale_x, s.scale_y)
+        end
+    end,
+    on_bg_click = function(self, vx, vy, button)
+        if button == 1 and menu_content.power_state == "off" then
+            menu_content:turnOn()
+        end
     end,
     enter = function(self)
         if menu_content.enter then

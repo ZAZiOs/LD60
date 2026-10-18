@@ -8,7 +8,7 @@ local Effects = require("src.core.effects")
 DEBUG = false
 
 function love.load(args)
-    love.window.setTitle("tech_plague")
+    love.window.setTitle("mr_havoc")
 
     if args then
         for _, v in ipairs(args) do

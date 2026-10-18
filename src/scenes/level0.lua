@@ -202,7 +202,7 @@ local Level1Scene = GameScene.new({
         Effects.drawCrt(s.canvas, s.x, s.y, s.scale_x, s.scale_y)
     end,
     enter = function(self)
-        AudioManager.musFadeTo("cat", 0.8, 0.5)
+        AudioManager.musFadeTo("crt", 0.8, 0.5)
     end,
     leave = function(self)
         AudioManager.musStop(0.5)

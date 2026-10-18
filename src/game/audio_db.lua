@@ -11,11 +11,21 @@ return {
     --   volume: number (default 1.0)
     -- ========================================================================
     music = {
+        ["crt"] = {
+            preloop = "assets/mus/crt_preloop.ogg",
+            loop = "assets/mus/crt_loop.ogg",
+            volume = 0.8,
+        },
         ["cat"] = {
             preloop = "assets/mus/cat_intro.ogg",
             loop = "assets/mus/cat_loop.ogg",
             volume = 0.8,
         },
+        ["web_havoc"] = {
+            preloop = "assets/mus/web_havoc_preloop.ogg",
+            loop = "assets/mus/web_havoc_loop.ogg",
+            volume = 0.8,
+        }
     },
 
     -- ========================================================================

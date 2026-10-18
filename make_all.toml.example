@@ -1,4 +1,4 @@
-name = "tech_plague"
+name = "mr_havoc"
 default_targets = ["win64", "lovejs"]
 build_directory = "bin"
 
@@ -14,4 +14,4 @@ love_files = [
 # love_binaries = "C:/path/to/love2d"
 
 [lovejs]
-title = "tech_plague"
+title = "mr_havoc"

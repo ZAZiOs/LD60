@@ -30,7 +30,7 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
         end
     })
     :addWindow("window_text", {
-        title = "17OCT.TXT",
+        title = "17oct.txt",
         x = 56,
         y = 40,
         w = 180,
@@ -74,8 +74,8 @@ local screen = PixelScreen.new({
     game = desktop,
     x = 320,
     y = 60,
-    w = 1280,
-    h = 960
+    w = 1282,
+    h = 962
 })
 
 local Level1Scene = GameScene.new({

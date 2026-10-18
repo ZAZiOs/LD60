@@ -79,6 +79,7 @@ function SceneManager.crossFade(name, duration, ...)
     love.graphics.push("all")
     love.graphics.setCanvas(canvas)
     love.graphics.origin()
+    love.graphics.setScissor()
     love.graphics.clear(0, 0, 0, 0)
     if SceneManager.current_scene and SceneManager.current_scene.screen then
         SceneManager.current_scene.screen.needs_render = true
@@ -216,6 +217,8 @@ function SceneManager.draw()
                 love.graphics.rectangle("fill", 0, 0, w, h)
             end
         end
+
+        love.graphics.setColor(1, 1, 1, 1)
     end
 end
 

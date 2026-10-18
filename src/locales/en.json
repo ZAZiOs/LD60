@@ -1,8 +1,8 @@
 {
   "game": {
-    "title": "tech_plague",
-    "start": "Start Game",
-    "quit": "Quit",
+    "title": "mr_havoc",
+    "start": "run",
+    "quit": "exit",
     "options": "Options",
     "back": "Back"
   }

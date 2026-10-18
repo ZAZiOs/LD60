@@ -2,7 +2,7 @@ local Config = {
     virtual_width = 1920,
     virtual_height = 1080,
 
-    window_title = "tech_plague",
+    window_title = "mr_havoc",
     default_window_width = 1920,
     default_window_height = 1080,
     min_window_width = 960,
