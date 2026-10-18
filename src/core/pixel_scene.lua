@@ -57,6 +57,9 @@ function PixelScene.new(id)
     self.on_key_fn = nil
     self.on_mouse_fn = nil
 
+    self.room_width = 320
+    self.room_height = 240
+
     return self
 end
 
@@ -229,10 +232,56 @@ function PixelScene:canInteractWith(el)
     return self:getInteractableElement() == el
 end
 
+function PixelScene:updateCamera(dt)
+    if not self.player or not self.camera then return end
+
+    local cam_w = 320
+    local cam_h = 240
+    
+    -- Deadzone settings
+    local deadzone_w = 120
+    local deadzone_h = 60
+    local deadzone_x = self.camera.x + (cam_w - deadzone_w) / 2
+    local deadzone_y = self.camera.y + (cam_h - deadzone_h) / 2
+    
+    local targetX = self.camera.x
+    local targetY = self.camera.y
+    
+    if self.player.x < deadzone_x then
+        targetX = self.player.x - (cam_w - deadzone_w) / 2
+    elseif self.player.x > deadzone_x + deadzone_w then
+        targetX = self.player.x - (cam_w + deadzone_w) / 2
+    end
+    
+    if self.player.y < deadzone_y then
+        targetY = self.player.y - (cam_h - deadzone_h) / 2
+    elseif self.player.y > deadzone_y + deadzone_h then
+        targetY = self.player.y - (cam_h + deadzone_h) / 2
+    end
+    
+    local max_cam_x = math.max(0, self.room_width - cam_w)
+    local max_cam_y = math.max(0, self.room_height - cam_h)
+    
+    targetX = math.max(0, math.min(targetX, max_cam_x))
+    targetY = math.max(0, math.min(targetY, max_cam_y))
+    
+    -- Smoothing
+    local speed = 1000
+    local t = 1 - math.exp(-speed * dt)
+    
+    self.camera.x = self.camera.x + (targetX - self.camera.x) * t
+    self.camera.y = self.camera.y + (targetY - self.camera.y) * t
+    
+    self.camera.x = math.floor(self.camera.x)
+    self.camera.y = math.floor(self.camera.y)
+end
+
 function PixelScene:update(dt)
     if self.on_update_fn then
         self:on_update_fn(dt)
     end
+
+    self:updateCamera(dt)
 
     for _, el in ipairs(self.elements) do
         if el.update then

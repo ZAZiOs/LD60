@@ -118,11 +118,12 @@ function Player:update(dt, scene)
     local prev_x = self.x
     self.x = self.x + self.vx * dt
 
+    local room_w = (scene and scene.room_width) or 320
     local half_w = self.box_w / 2
     if self.x - half_w < 0 then
         self.x = half_w
-    elseif self.x + half_w > 320 then
-        self.x = 320 - half_w
+    elseif self.x + half_w > room_w then
+        self.x = room_w - half_w
     end
 
     self.touching_left_solid = nil
@@ -169,8 +170,9 @@ function Player:update(dt, scene)
         end
     end
 
-    if self.y >= 224 then
-        self.y = 224
+    local room_h = (scene and scene.room_height) or 240
+    if self.y >= room_h  then
+        self.y = room_h 
         self.vy = 0
         self.is_grounded = true
     end

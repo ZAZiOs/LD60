@@ -9,6 +9,12 @@ function PixelSceneBuilder.new(id)
     return self
 end
 
+function PixelSceneBuilder:setRoomBounds(w, h)
+    self.scene.room_width = w or 320
+    self.scene.room_height = h or 240
+    return self
+end
+
 function PixelSceneBuilder:background(path_or_color)
     self.scene:setBackground(path_or_color)
     return self
