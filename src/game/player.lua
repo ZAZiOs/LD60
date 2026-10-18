@@ -93,6 +93,15 @@ function Player.new(opts)
     self.scale_y = 1
     self.was_crouching = false
 
+    self.tail_length = opts.tail_length or 8
+    self.tail_root_x = self.x - self.facing * 3 * self.scale_x
+    self.tail_root_y = self.y - 10 * self.scale_y
+    self.tail_tip_x = self.tail_root_x - self.facing * self.tail_length
+    self.tail_tip_y = self.tail_root_y + 2
+    self.tail_vx = 0
+    self.tail_vy = 0
+    self.tail_time = 0
+
     local ini_path = opts.sheet or "assets/rage/rage_sh.ini"
     self.anim = SpritesheetManager.createAnimation(ini_path, "idle")
 
@@ -430,6 +439,71 @@ function Player:update(dt, scene)
     self.scale_x = self.scale_x + (target_sx - self.scale_x) * math.min(1, dt * recover_speed)
     self.scale_y = self.scale_y + (target_sy - self.scale_y) * math.min(1, dt * recover_speed)
 
+    self.tail_time = self.tail_time + dt
+
+    local target_root_x = self.x - self.facing * 3 * self.scale_x
+    local target_root_y = self.y - 7 * self.scale_y
+
+    if not self.tail_root_x then
+        self.tail_root_x = target_root_x
+        self.tail_root_y = target_root_y
+    end
+
+    local root_follow_speed = 26
+    self.tail_root_x = self.tail_root_x + (target_root_x - self.tail_root_x) * math.min(1, dt * root_follow_speed)
+    self.tail_root_y = self.tail_root_y + (target_root_y - self.tail_root_y) * math.min(1, dt * root_follow_speed)
+    local root_x = self.tail_root_x
+    local root_y = self.tail_root_y
+
+    local rest_x = root_x - self.facing * (self.tail_length * 0.75)
+    local rest_y = root_y + 2.5
+
+    if self.is_grounded and math.abs(self.vx) < 5 then
+        rest_y = rest_y + math.sin(self.tail_time * 4.5) * 1.5
+        rest_x = rest_x + math.cos(self.tail_time * 2.5) * 0.8
+    end
+
+    local air_push_x = -self.vx * 0.022
+    local air_push_y = -self.vy * 0.016
+    rest_x = rest_x + air_push_x
+    rest_y = rest_y + air_push_y
+
+    local sim_dt = math.min(dt, 0.04)
+    local sub_steps = 2
+    local sdt = sim_dt / sub_steps
+    local spring_k = 46
+    local damping = 8.5
+    local gravity = 35
+
+    for _ = 1, sub_steps do
+        local fx = (rest_x - self.tail_tip_x) * spring_k - self.tail_vx * damping
+        local fy = (rest_y - self.tail_tip_y) * spring_k - self.tail_vy * damping + gravity
+
+        self.tail_vx = self.tail_vx + fx * sdt
+        self.tail_vy = self.tail_vy + fy * sdt
+
+        self.tail_tip_x = self.tail_tip_x + self.tail_vx * sdt
+        self.tail_tip_y = self.tail_tip_y + self.tail_vy * sdt
+
+        -- Distance constraint (rod/rope length)
+        local t_dx = self.tail_tip_x - root_x
+        local t_dy = self.tail_tip_y - root_y
+        local dist = math.sqrt(t_dx * t_dx + t_dy * t_dy)
+        if dist > self.tail_length then
+            local nx = t_dx / dist
+            local ny = t_dy / dist
+            self.tail_tip_x = root_x + nx * self.tail_length
+            self.tail_tip_y = root_y + ny * self.tail_length
+
+            -- Dissipate velocity along normal to keep simulation stable
+            local vn = self.tail_vx * nx + self.tail_vy * ny
+            if vn > 0 then
+                self.tail_vx = self.tail_vx - vn * nx
+                self.tail_vy = self.tail_vy - vn * ny
+            end
+        end
+    end
+
     if self.anim then
         if self.is_grounded then
             if down_held and math.abs(self.vx) < 5 then
@@ -456,6 +530,71 @@ function Player:update(dt, scene)
     end
 end
 
+local function drawPixel(x, y)
+    love.graphics.rectangle("fill", math.floor(x), math.floor(y), 1, 1)
+end
+
+local function drawPixelLine(x0, y0, x1, y1)
+    local dx = math.abs(x1 - x0)
+    local dy = -math.abs(y1 - y0)
+    local sx = x0 < x1 and 1 or -1
+    local sy = y0 < y1 and 1 or -1
+    local err = dx + dy
+    while true do
+        drawPixel(x0, y0)
+        if x0 == x1 and y0 == y1 then break end
+        local e2 = 2 * err
+        if e2 >= dy then
+            err = err + dy
+            x0 = x0 + sx
+        end
+        if e2 <= dx then
+            err = err + dx
+            y0 = y0 + sy
+        end
+    end
+end
+
+local function drawPixelArrowTip(tx, ty, rx, ry, facing)
+    local dx = tx - rx
+    local dy = ty - ry
+    if dx == 0 and dy == 0 then
+        dx = -facing
+        dy = 0
+    end
+
+    local adx = math.abs(dx)
+    local ady = math.abs(dy)
+    local sx = dx >= 0 and 1 or -1
+    local sy = dy >= 0 and 1 or -1
+
+    if adx > 1.8 * ady then
+        -- Horizontal (pointing along sx)
+        drawPixel(tx, ty)
+        drawPixel(tx - sx, ty - 1)
+        drawPixel(tx - sx, ty)
+        drawPixel(tx - sx, ty + 1)
+        drawPixel(tx - 2 * sx, ty - 1)
+        drawPixel(tx - 2 * sx, ty + 1)
+    elseif ady > 1.8 * adx then
+        -- Vertical (pointing along sy)
+        drawPixel(tx, ty)
+        drawPixel(tx - 1, ty - sy)
+        drawPixel(tx, ty - sy)
+        drawPixel(tx + 1, ty - sy)
+        drawPixel(tx - 1, ty - 2 * sy)
+        drawPixel(tx + 1, ty - 2 * sy)
+    else
+        -- Diagonal (pointing along sx, sy)
+        drawPixel(tx, ty)
+        drawPixel(tx - sx, ty)
+        drawPixel(tx, ty - sy)
+        drawPixel(tx - sx, ty - sy)
+        drawPixel(tx - 2 * sx, ty)
+        drawPixel(tx, ty - 2 * sy)
+    end
+end
+
 function Player:draw()
     if #self.slide_particles > 0 then
         for _, p in ipairs(self.slide_particles) do
@@ -464,6 +603,18 @@ function Player:draw()
             local sz = p.size or 2
             love.graphics.rectangle("fill", math.floor(p.x + 0.5), math.floor(p.y + 0.5), sz, sz)
         end
+    end
+
+    -- Draw vector tail (1px pixel-perfect line + 3x3 pixel arrowhead ->)
+    if self.tail_tip_x and self.tail_tip_y then
+        local root_x = math.floor((self.tail_root_x or (self.x - self.facing * 3 * self.scale_x)) + 0.5)
+        local root_y = math.floor((self.tail_root_y or (self.y - 7 * self.scale_y)) + 0.5)
+        local tip_x = math.floor(self.tail_tip_x + 0.5)
+        local tip_y = math.floor(self.tail_tip_y + 0.5)
+
+        love.graphics.setColor(0.933, 0.176, 0.157) -- dark: 0.286, 0.035, 0.027; light: 0.933, 0.176, 0.157
+        drawPixelLine(root_x, root_y, tip_x, tip_y)
+        drawPixelArrowTip(tip_x, tip_y, root_x, root_y, self.facing)
     end
 
     if self.anim then
