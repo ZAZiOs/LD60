@@ -74,6 +74,7 @@ function Player.new(opts)
     self.is_wall_sliding = false
     self.last_jumped_wall_dir = 0
     self.same_wall_cooldown = 0
+    self.wall_safe_floor_dist = opts.wall_safe_floor_dist or 10
 
     self.slide_particles = {}
     self.particle_timer = 0
@@ -144,7 +145,45 @@ function Player:getHitbox()
     }
 end
 
+function Player:getDistanceToFloor(scene)
+    if self.is_grounded then
+        return 0
+    end
+
+    local sc = scene or self.scene
+    local half_w = self.box_w / 2
+    local room_h = (sc and sc.room_height) or 240
+    local min_dist = math.max(0, room_h - self.y)
+
+    if sc and sc.elements then
+        for _, el in ipairs(sc.elements) do
+            if el.visible and el.is_solid then
+                local boxes = getElementBoxes(el)
+                for _, box in ipairs(boxes) do
+                    local ex, ey, ew, eh = box.x, box.y, box.w, box.h
+                    -- Overlaps horizontally with player collision box
+                    if (self.x + half_w) > ex and (self.x - half_w) < (ex + ew) then
+                        if ey >= self.y - 2 then
+                            local d = math.max(0, ey - self.y)
+                            if d < min_dist then
+                                min_dist = d
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return min_dist
+end
+
+function Player:canWallJump(scene)
+    return self:getDistanceToFloor(scene) >= self.wall_safe_floor_dist
+end
+
 function Player:update(dt, scene)
+    self.scene = scene
     local move = 0
     local down_held = love.keyboard.isDown("down") or love.keyboard.isDown("s")
 
@@ -182,7 +221,7 @@ function Player:update(dt, scene)
         self.jump_buffer_timer = math.max(0, self.jump_buffer_timer - dt)
         if self.coyote_timer > 0 then
             self:jump()
-        elseif self.is_wall_sliding or self.wall_coyote_timer > 0 then
+        elseif (self.is_wall_sliding or self.wall_coyote_timer > 0) and self:canWallJump(scene) then
             self:wallJump()
         end
     end
@@ -350,7 +389,9 @@ function Player:update(dt, scene)
         local pressing_into_wall = (wall_contact_dir == -1 and (love.keyboard.isDown("left") or love.keyboard.isDown("a")))
                                 or (wall_contact_dir == 1 and (love.keyboard.isDown("right") or love.keyboard.isDown("d")))
 
-        local can_slide_on_this_wall = (wall_contact_dir ~= 0) and not (wall_contact_dir == self.last_jumped_wall_dir and self.same_wall_cooldown > 0)
+        local can_slide_on_this_wall = (wall_contact_dir ~= 0)
+                                    and not (wall_contact_dir == self.last_jumped_wall_dir and self.same_wall_cooldown > 0)
+                                    and self:canWallJump(scene)
 
         if can_slide_on_this_wall and self.vy > 0 and pressing_into_wall then
             self.is_wall_sliding = true
@@ -442,7 +483,7 @@ function Player:update(dt, scene)
     self.tail_time = self.tail_time + dt
 
     local target_root_x = self.x - self.facing * 3 * self.scale_x
-    local target_root_y = self.y - 7 * self.scale_y
+    local target_root_y = self.y - 10 * self.scale_y
 
     if not self.tail_root_x then
         self.tail_root_x = target_root_x
@@ -608,7 +649,7 @@ function Player:draw()
     -- Draw vector tail (1px pixel-perfect line + 3x3 pixel arrowhead ->)
     if self.tail_tip_x and self.tail_tip_y then
         local root_x = math.floor((self.tail_root_x or (self.x - self.facing * 3 * self.scale_x)) + 0.5)
-        local root_y = math.floor((self.tail_root_y or (self.y - 7 * self.scale_y)) + 0.5)
+        local root_y = math.floor((self.tail_root_y or (self.y - 10 * self.scale_y)) + 0.5)
         local tip_x = math.floor(self.tail_tip_x + 0.5)
         local tip_y = math.floor(self.tail_tip_y + 0.5)
 
@@ -736,7 +777,7 @@ function Player:keypressed(key, scene)
         self.jump_buffer_timer = self.jump_buffer_time
         if self.coyote_timer > 0 then
             self:jump()
-        elseif self.is_wall_sliding or self.wall_coyote_timer > 0 then
+        elseif (self.is_wall_sliding or self.wall_coyote_timer > 0) and self:canWallJump(scene) then
             self:wallJump()
         end
     end
