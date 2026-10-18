@@ -60,7 +60,23 @@ function Player.new(opts)
     self.gravity_apex = opts.gravity_apex or 420
     self.max_fall = opts.max_fall or 320
 
+    self.wall_slide_speed = opts.wall_slide_speed or 45
+    self.wall_jump_force = opts.wall_jump_force or -230
+    self.wall_jump_speed = opts.wall_jump_speed or 185
+    self.wall_jump_lock_time = opts.wall_jump_lock_time or 0.22
+    self.wall_coyote_time = opts.wall_coyote_time or 0.1
 
+    self.wall_coyote_timer = 0
+    self.wall_jump_lock = 0
+    self.wall_kick_timer = 0
+    self.wall_dir = 0
+    self.last_wall_dir = 0
+    self.is_wall_sliding = false
+    self.last_jumped_wall_dir = 0
+    self.same_wall_cooldown = 0
+
+    self.slide_particles = {}
+    self.particle_timer = 0
 
     self.coyote_timer = 0
     self.coyote_time = 0.08
@@ -92,6 +108,24 @@ function Player:jump()
     self.scale_y = 1.3
 end
 
+function Player:wallJump(dir)
+    local kick_dir = dir or (self.wall_dir ~= 0 and self.wall_dir) or (self.last_wall_dir ~= 0 and self.last_wall_dir) or self.facing
+    self.vy = self.wall_jump_force
+    self.vx = -kick_dir * self.wall_jump_speed
+    self.facing = -kick_dir
+    self.wall_jump_lock = self.wall_jump_lock_time
+    self.last_jumped_wall_dir = kick_dir
+    self.same_wall_cooldown = 0.30
+    self.wall_kick_timer = 0.22
+    self.wall_coyote_timer = 0
+    self.jump_buffer_timer = 0
+    self.is_wall_sliding = false
+    self.is_grounded = false
+    self.coyote_timer = 0
+    self.scale_x = 0.74
+    self.scale_y = 1.32
+end
+
 function Player:getHitbox()
     return {
         x = self.x - self.box_w / 2,
@@ -112,9 +146,21 @@ function Player:update(dt, scene)
         move = move + 1
     end
 
-    self.vx = move * self.speed
-    if move ~= 0 then
-        self.facing = move
+    if self.same_wall_cooldown > 0 then
+        self.same_wall_cooldown = math.max(0, self.same_wall_cooldown - dt)
+    end
+
+    if self.wall_jump_lock > 0 then
+        self.wall_jump_lock = math.max(0, self.wall_jump_lock - dt)
+        local flight_dir = -self.last_jumped_wall_dir
+        if flight_dir ~= 0 and move == flight_dir then
+            self.vx = flight_dir * math.max(self.speed, math.abs(self.vx))
+        end
+    else
+        self.vx = move * self.speed
+        if move ~= 0 and not self.is_wall_sliding then
+            self.facing = move
+        end
     end
 
     if self.is_grounded then
@@ -127,6 +173,8 @@ function Player:update(dt, scene)
         self.jump_buffer_timer = math.max(0, self.jump_buffer_timer - dt)
         if self.coyote_timer > 0 then
             self:jump()
+        elseif self.is_wall_sliding or self.wall_coyote_timer > 0 then
+            self:wallJump()
         end
     end
 
@@ -192,6 +240,30 @@ function Player:update(dt, scene)
         end
     end
 
+    local on_left_wall = (self.x - half_w <= 0.5) or (self.touching_left_solid ~= nil)
+    local on_right_wall = (self.x + half_w >= room_w - 0.5) or (self.touching_right_solid ~= nil)
+
+    if scene and scene.elements then
+        for _, el in ipairs(scene.elements) do
+            if el.visible and el.is_solid and not (el.is_one_way or el.one_way or el.top_only) then
+                local boxes = getElementBoxes(el)
+                for _, box in ipairs(boxes) do
+                    if not (box.one_way or box.top_only or box.is_one_way) then
+                        local ex, ey, ew, eh = box.x, box.y, box.w, box.h
+                        if (self.y > ey + 2) and (self.y - self.box_h < ey + eh - 2) then
+                            if math.abs((self.x + half_w) - ex) <= 1.5 then
+                                on_right_wall = true
+                            end
+                            if math.abs((self.x - half_w) - (ex + ew)) <= 1.5 then
+                                on_left_wall = true
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
     local was_grounded = self.is_grounded
     local fall_speed = self.vy
 
@@ -245,6 +317,101 @@ function Player:update(dt, scene)
         self.scale_y = 0.8
     end
 
+    if self.is_grounded then
+        self.is_wall_sliding = false
+        self.wall_dir = 0
+        self.wall_coyote_timer = 0
+        self.wall_kick_timer = 0
+        self.wall_jump_lock = 0
+        self.same_wall_cooldown = 0
+        self.last_jumped_wall_dir = 0
+    else
+        local wall_contact_dir = 0
+        if on_left_wall then
+            wall_contact_dir = -1
+        elseif on_right_wall then
+            wall_contact_dir = 1
+        end
+
+        if wall_contact_dir ~= 0 and wall_contact_dir ~= self.last_jumped_wall_dir then
+            self.same_wall_cooldown = 0
+            self.last_jumped_wall_dir = 0
+        end
+
+        local pressing_into_wall = (wall_contact_dir == -1 and (love.keyboard.isDown("left") or love.keyboard.isDown("a")))
+                                or (wall_contact_dir == 1 and (love.keyboard.isDown("right") or love.keyboard.isDown("d")))
+
+        local can_slide_on_this_wall = (wall_contact_dir ~= 0) and not (wall_contact_dir == self.last_jumped_wall_dir and self.same_wall_cooldown > 0)
+
+        if can_slide_on_this_wall and self.vy > 0 and pressing_into_wall then
+            self.is_wall_sliding = true
+            self.wall_dir = wall_contact_dir
+            self.last_wall_dir = wall_contact_dir
+            self.wall_coyote_timer = self.wall_coyote_time
+            self.facing = wall_contact_dir
+
+            if self.vy > self.wall_slide_speed then
+                self.vy = self.wall_slide_speed
+            end
+        else
+            self.is_wall_sliding = false
+            self.wall_dir = 0
+            if can_slide_on_this_wall then
+                self.last_wall_dir = wall_contact_dir
+                self.wall_coyote_timer = self.wall_coyote_time
+            else
+                self.wall_coyote_timer = math.max(0, self.wall_coyote_timer - dt)
+            end
+        end
+    end
+
+    if self.wall_kick_timer > 0 then
+        self.wall_kick_timer = math.max(0, self.wall_kick_timer - dt)
+    end
+
+    if self.is_wall_sliding and self.vy > 5 then
+        self.particle_timer = self.particle_timer + dt
+        while self.particle_timer >= 0.022 do
+            self.particle_timer = self.particle_timer - 0.022
+            local wall_edge_x = (self.facing == 1) and (self.x + half_w) or (self.x - half_w)
+            local py = self.y - math.random(2, math.max(4, self.box_h - 2))
+            local p_vx = -self.facing * math.random(8, 24)
+            local p_vy = -math.random(10, 34)
+            local lifetime = 0.28 + math.random() * 0.25
+            local gray = 0.78 + math.random() * 0.20
+            local alpha = 0.65 + math.random() * 0.30
+
+            table.insert(self.slide_particles, {
+                x = wall_edge_x,
+                y = py,
+                vx = p_vx,
+                vy = p_vy,
+                life = lifetime,
+                max_life = lifetime,
+                size = 2,
+                r = gray,
+                g = gray,
+                b = gray,
+                alpha = alpha
+            })
+        end
+    else
+        self.particle_timer = 0
+    end
+
+    for i = #self.slide_particles, 1, -1 do
+        local p = self.slide_particles[i]
+        p.life = p.life - dt
+        if p.life <= 0 then
+            table.remove(self.slide_particles, i)
+        else
+            p.x = p.x + p.vx * dt
+            p.y = p.y + p.vy * dt
+            p.vx = p.vx * math.max(0, 1 - 3 * dt)
+            p.vy = p.vy * math.max(0, 1 - 2 * dt)
+        end
+    end
+
     local is_crouching = self.is_grounded and down_held and math.abs(self.vx) < 5
     if is_crouching and not self.was_crouching then
         self.scale_x = 1.24
@@ -273,10 +440,16 @@ function Player:update(dt, scene)
                 self.anim:play("idle")
             end
         else
-            if self.vy < 0 then
-                self.anim:play("jump")
+            if self.is_wall_sliding then
+                self.anim:play("wallslide")
+            elseif self.wall_kick_timer > 0 then
+                self.anim:play("wallkick")
             else
-                self.anim:play("fall")
+                if self.vy < 0 then
+                    self.anim:play("jump")
+                else
+                    self.anim:play("fall")
+                end
             end
         end
         self.anim:update(dt)
@@ -284,6 +457,15 @@ function Player:update(dt, scene)
 end
 
 function Player:draw()
+    if #self.slide_particles > 0 then
+        for _, p in ipairs(self.slide_particles) do
+            local current_alpha = (p.life / p.max_life) * p.alpha
+            love.graphics.setColor(p.r, p.g, p.b, current_alpha)
+            local sz = p.size or 2
+            love.graphics.rectangle("fill", math.floor(p.x + 0.5), math.floor(p.y + 0.5), sz, sz)
+        end
+    end
+
     if self.anim then
         love.graphics.setColor(1, 1, 1, 1)
         local draw_x = math.floor(self.x + 0.5)
@@ -403,6 +585,8 @@ function Player:keypressed(key, scene)
         self.jump_buffer_timer = self.jump_buffer_time
         if self.coyote_timer > 0 then
             self:jump()
+        elseif self.is_wall_sliding or self.wall_coyote_timer > 0 then
+            self:wallJump()
         end
     end
 
