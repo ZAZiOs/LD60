@@ -94,7 +94,7 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
         z_index = -2,
         onInteract = function(self)
             if GameState.get("level1_vent_opened") then
-                SceneManager.crossFade("level2", 0.4)
+                SceneManager.crossFade("level1-2", 0.4)
             end
             if GameState.get("level1_crowbar_collected") then
                 self.image = "assets/level1/vent_o.png"
@@ -241,14 +241,12 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
         w = 180,
         h = 120,
         visible = false,
-        text = [[October 17
+        text = [[Dear Diary,
 
-Meow meow :3
-meow meow mew meow
-meow meow mew meow
-meow meow mew meow
-meow meow mew meow
-]],
+Today my Daddy gifted me a really cool pony game! When we were downloading it, some window popped out and asked for some kind of code..? I think it's a password to his own account on his computer. He entered it to run my game as “admenistraightour”? I don't know what that means!
+
+I peeked over Dad's shoulder and saw the code - it's  8 4 7 9 !
+Sorry, Dad!]],
         onClose = function(self)
             local tab = self.scene:getElement("tab_text")
             if tab then
@@ -261,17 +259,6 @@ meow meow mew meow
         y = 224,
         sheet = "assets/rage/rage_sh.ini"
     })
-    :onKey(function(self, action, key)
-        if action == "press" then
-            if key == "escape" then
-                SceneManager.goTo("menu")
-            elseif key == "backspace" then
-                SceneManager.crossFade("level0", 0.4)
-            elseif key == "return" then
-                SceneManager.goTo("level2")
-            end
-        end
-    end)
     :build()
 
 local screen = PixelScreen.new({
@@ -289,7 +276,7 @@ local Level1Scene = GameScene.new({
         Effects.drawCrt(s.canvas, s.x, s.y, s.scale_x, s.scale_y)
     end,
     enter = function(self)
-        AudioManager.musFadeTo("cat", 0.8, 0.5)
+        AudioManager.musFadeTo("cat", 0.8, 0.5, "base")
     end,
     leave = function(self)
         AudioManager.musStop(0.5)

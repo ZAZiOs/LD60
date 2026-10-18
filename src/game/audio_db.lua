@@ -20,6 +20,12 @@ return {
             preloop = "assets/mus/cat_intro.ogg",
             loop = "assets/mus/cat_loop.ogg",
             volume = 0.8,
+            fx = {
+                reverb = {
+                    preloop = "assets/mus/cat_intro_reverb.ogg",
+                    loop = "assets/mus/cat_loop_reverb.ogg",
+                }
+            }
         },
         ["web_havoc"] = {
             preloop = "assets/mus/web_havoc_preloop.ogg",
