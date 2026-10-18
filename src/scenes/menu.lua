@@ -113,7 +113,7 @@ function menu_content:confirm()
     local opt = self.options[self.selected]
     if not opt then return end
     if opt.id == "start" then
-        SceneManager.crossFade("level1", 0.2)
+        SceneManager.crossFade("level0", 0.2)
     elseif opt.id == "quit" then
         love.event.quit()
     end

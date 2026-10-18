@@ -13,41 +13,41 @@ local desktop = PixelSceneBuilder.new("desktop")
     :cursor("assets/cursor.ini")
     :addElement({
         id = "tutorial",
-        image = "assets/level1/desktop/tutorial.png",
+        image = "assets/level0/desktop/tutorial.png",
         x = 0,
         y = 0,
         z_index = 1
     })
     :addSolid("taskbar", {
-        image = "assets/level1/desktop/taskbar.png",
+        image = "assets/level0/desktop/taskbar.png",
         x = 0,
         y = 224,
         w = 320,
         h = 16
     })
     :addSolid("taskbar_2", {
-        image = "assets/level1/desktop/taskbar.png",
+        image = "assets/level0/desktop/taskbar.png",
         x = 20,
         y = 190,
         w = 320,
         h = 16
     })
     :addSolid("taskbar_3", {
-        image = "assets/level1/desktop/taskbar.png",
+        image = "assets/level0/desktop/taskbar.png",
         x = 40,
         y = 160,
         w = 320,
         h = 16
     })
     :addSolid("taskbar_4", {
-        image = "assets/level1/desktop/taskbar.png",
+        image = "assets/level0/desktop/taskbar.png",
         x = 60,
         y = 130,
         w = 320,
         h = 16
     })
     :addSolid("taskbar_5", {
-        image = "assets/level1/desktop/taskbar.png",
+        image = "assets/level0/desktop/taskbar.png",
         x = 40,
         y = 100,
         w = 320,
@@ -63,8 +63,8 @@ local desktop = PixelSceneBuilder.new("desktop")
         tail_width = 7
     })
     :addTab("tab_readme", {
-        idle = "assets/level1/desktop/tab_readme.png",
-        active = "assets/level1/desktop/tab_readme_a.png",
+        idle = "assets/level0/desktop/tab_readme.png",
+        active = "assets/level0/desktop/tab_readme_a.png",
         x = 62,
         y = 226,
         onClick = function(self)
@@ -81,8 +81,8 @@ local desktop = PixelSceneBuilder.new("desktop")
         end
     })
     :addTab("tab_settings", {
-        idle = "assets/level1/desktop/tab_settings.png",
-        active = "assets/level1/desktop/tab_settings_a.png",
+        idle = "assets/level0/desktop/tab_settings.png",
+        active = "assets/level0/desktop/tab_settings_a.png",
         x = 115,
         y = 226,
         require_key = "down",
@@ -217,7 +217,7 @@ local screen = PixelScreen.new({
     h = 960
 })
 
-local Level1Scene = GameScene.new({
+local Level0Scene = GameScene.new({
     bg = "assets/bg/intro_bg.png",
     screen = screen,
     screen_draw_fn = function(s)
@@ -238,4 +238,4 @@ local Level1Scene = GameScene.new({
     end
 })
 
-return Level1Scene
+return Level0Scene

@@ -28,6 +28,7 @@ function love.load(args)
     Effects.load()
 
     SceneManager.register("menu", "src.scenes.menu")
+    SceneManager.register("level0", "src.scenes.level0")
     SceneManager.register("level1", "src.scenes.level1")
     SceneManager.register("level2", "src.scenes.level2")
 
@@ -70,7 +71,7 @@ function love.keypressed(key, scancode, isrepeat)
     if DEBUG then
         local current = SceneManager.getCurrentName()
         -- Rooms for debug
-        local debug_rooms = { "menu", "test_camera", "level1", "level2" }
+        local debug_rooms = { "menu", "test_camera", "level0", "level1", "level2" }
         
         -- Current index
         local current_index = 1

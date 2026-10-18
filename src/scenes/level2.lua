@@ -16,7 +16,7 @@ end
 
 function Level2:keypressed(key)
     if key == "return" then
-        SceneManager.goTo("level1")
+        SceneManager.goTo("level0")
     elseif key == "backspace" then
         SceneManager.goTo("menu")
     end
