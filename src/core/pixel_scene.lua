@@ -455,6 +455,11 @@ function PixelScene:drawElement(el, shader)
     if current_img then
         love.graphics.draw(current_img, el.x, el.y)
     end
+    if el.color then
+        love.graphics.setColor(el.color[1], el.color[2], el.color[3], el.color[4] or 1)
+        love.graphics.rectangle("fill", el.x, el.y, el.w, el.h)
+        love.graphics.setColor(1, 1, 1, 1)
+    end
     if el.draw then
         el:draw()
     end
