@@ -49,6 +49,9 @@ function PixelSceneBuilder:addSolid(id, opts)
                 self.x = spawn_x
                 direction = 1
             end
+            -- Keep moving platforms on whole world pixels to prevent
+            -- subpixel shimmer in the pixel-art render.
+            self.x = math.floor(self.x + 0.5)
         end
     end
     if opts.is_taskbar or id == "taskbar" or (type(id) == "string" and id:match("^taskbar")) then

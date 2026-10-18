@@ -415,8 +415,6 @@ function PixelScene:update(dt)
         self:on_update_fn(dt)
     end
 
-    self:updateCamera(dt)
-
     for _, el in ipairs(self.elements) do
         if el.update then
             el:update(dt)
@@ -426,6 +424,9 @@ function PixelScene:update(dt)
     if self.player then
         self.player:update(dt, self)
     end
+
+    -- Track the player after platform carry and movement are applied.
+    self:updateCamera(dt)
 
     self.current_hovered = self:getHoveredElement()
     self.current_interactable = self:getInteractableElement()
