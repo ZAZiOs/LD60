@@ -38,7 +38,9 @@ function PixelSceneBuilder:addSolid(id, opts)
         local end_x = spawn_x + math.abs(opts.max_delta_x)
         local direction = opts.direction or 1
         opts.x, opts.y = spawn_x + opts.max_delta_x / 2, spawn_y
+        opts.previous_x = opts.x
         opts.update = function(self, dt)
+            self.previous_x = self.x
             self.x = self.x + math.abs(opts.speed) * direction * dt
             if self.x >= end_x then
                 self.x = end_x

@@ -359,7 +359,7 @@ function PixelScene:updateCamera(dt)
     local cam_h = 240
     
     -- Deadzone settings
-    local deadzone_w = self.camera_deadzone_w or 100
+    local deadzone_w = self.camera_deadzone_w or 60
     local deadzone_h = self.camera_deadzone_h or 60
     local deadzone_x = self.camera.x + (cam_w - deadzone_w) / 2
     local deadzone_y = self.camera.y + (cam_h - deadzone_h) / 2
