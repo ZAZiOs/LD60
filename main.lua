@@ -39,6 +39,11 @@ function love.load(args)
     SceneManager.register("gameover", "src.scenes.gameover")
     SceneManager.register("soundcheck", "src.scenes.soundcheck")
 
+    if DEBUG then
+        SceneManager.goTo("level1-3")
+        return
+    end
+
     SceneManager.goTo("menu")
 end
 
