@@ -443,11 +443,12 @@ function PixelScene:drawElement(el, shader)
             end
             love.graphics.setShader()
         elseif el.w and el.h and el.w > 0 and el.h > 0 then
+            local ow = el.outline_width or 1
             love.graphics.setColor(1, 1, 1, 1)
-            love.graphics.rectangle("fill", el.x - 1, el.y - 1, el.w + 2, 1)
-            love.graphics.rectangle("fill", el.x - 1, el.y + el.h, el.w + 2, 1)
-            love.graphics.rectangle("fill", el.x - 1, el.y, 1, el.h)
-            love.graphics.rectangle("fill", el.x + el.w, el.y, 1, el.h)
+            love.graphics.rectangle("fill", el.x - ow, el.y - ow, el.w + ow * 2, ow)
+            love.graphics.rectangle("fill", el.x - ow, el.y + el.h, el.w + ow * 2, ow)
+            love.graphics.rectangle("fill", el.x - ow, el.y, ow, el.h)
+            love.graphics.rectangle("fill", el.x + el.w, el.y, ow, el.h)
         end
     end
 

@@ -254,10 +254,10 @@ desktop = PixelSceneBuilder.new("desktop")
         visible = false,
         clickable = true,
         onInteract = function(self)
-            SceneManager.crossFade("level2", 0.4)
+            SceneManager.crossFade("level1-3", 0.4)
         end,
         onClick = function(self)
-            SceneManager.crossFade("level2", 0.4)
+            SceneManager.crossFade("level1-3", 0.4)
         end
     })
     :spawnPlayer({
