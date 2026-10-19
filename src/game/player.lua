@@ -89,6 +89,7 @@ function Player.new(opts)
 
     self.facing = 1
     self.is_grounded = false
+    self.ground_platform = nil
 
     self.scale_x = 1
     self.scale_y = 1
@@ -215,6 +216,12 @@ function Player:update(dt, scene)
         end
     end
 
+    local carried_x = 0
+    if self.ground_platform and self.is_grounded then
+        carried_x = self.ground_platform.x - (self.ground_platform.previous_x or self.ground_platform.x)
+    end
+    self.ground_platform = nil
+
     local move = 0
     local down_held = love.keyboard.isDown("down") or love.keyboard.isDown("s")
 
@@ -282,7 +289,7 @@ function Player:update(dt, scene)
 
 
     local prev_x = self.x
-    self.x = self.x + self.vx * dt
+    self.x = self.x + carried_x + self.vx * dt
 
     local room_w = (scene and scene.room_width) or 320
     local half_w = self.box_w / 2
@@ -351,6 +358,7 @@ function Player:update(dt, scene)
     self.is_grounded = false
 
     local landed_y = nil
+    local landed_platform = nil
     if scene and scene.elements then
         for _, el in ipairs(scene.elements) do
             if el.visible and el.is_solid then
@@ -371,6 +379,7 @@ function Player:update(dt, scene)
                         if can_land then
                             if not landed_y or ey < landed_y then
                                 landed_y = ey
+                                landed_platform = el
                             end
                         end
                     end
@@ -382,6 +391,7 @@ function Player:update(dt, scene)
         self.y = landed_y
         self.vy = 0
         self.is_grounded = true
+        self.ground_platform = landed_platform
     end
 
     local room_h = (scene and scene.room_height) or 240

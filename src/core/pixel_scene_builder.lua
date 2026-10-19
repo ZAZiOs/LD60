@@ -32,7 +32,29 @@ function PixelSceneBuilder:addSolid(id, opts)
     opts = opts or {}
     opts.id = id
     opts.is_solid = true
-    if opts.is_taskbar or id == "taskbar" then
+    if opts.speed and opts.max_delta_x then
+        local spawn_x = opts.spawn_x or opts.x or 0
+        local spawn_y = opts.spawn_y or opts.y or 0
+        local end_x = spawn_x + math.abs(opts.max_delta_x)
+        local direction = opts.direction or 1
+        opts.x, opts.y = spawn_x + opts.max_delta_x / 2, spawn_y
+        opts.previous_x = opts.x
+        opts.update = function(self, dt)
+            self.previous_x = self.x
+            self.x = self.x + math.abs(opts.speed) * direction * dt
+            if self.x >= end_x then
+                self.x = end_x
+                direction = -1
+            elseif self.x <= spawn_x then
+                self.x = spawn_x
+                direction = 1
+            end
+            -- Keep moving platforms on whole world pixels to prevent
+            -- subpixel shimmer in the pixel-art render.
+            self.x = math.floor(self.x + 0.5)
+        end
+    end
+    if opts.is_taskbar or id == "taskbar" or (type(id) == "string" and id:match("^taskbar")) then
         opts.is_taskbar = true
         opts.fixed = (opts.fixed ~= false)
         opts.z_index = opts.z_index or 1000

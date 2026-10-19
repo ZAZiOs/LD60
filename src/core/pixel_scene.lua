@@ -359,7 +359,7 @@ function PixelScene:updateCamera(dt)
     local cam_h = 240
     
     -- Deadzone settings
-    local deadzone_w = self.camera_deadzone_w or 100
+    local deadzone_w = self.camera_deadzone_w or 60
     local deadzone_h = self.camera_deadzone_h or 60
     local deadzone_x = self.camera.x + (cam_w - deadzone_w) / 2
     local deadzone_y = self.camera.y + (cam_h - deadzone_h) / 2
@@ -415,8 +415,6 @@ function PixelScene:update(dt)
         self:on_update_fn(dt)
     end
 
-    self:updateCamera(dt)
-
     for _, el in ipairs(self.elements) do
         if el.update then
             el:update(dt)
@@ -426,6 +424,9 @@ function PixelScene:update(dt)
     if self.player then
         self.player:update(dt, self)
     end
+
+    -- Track the player after platform carry and movement are applied.
+    self:updateCamera(dt)
 
     self.current_hovered = self:getHoveredElement()
     self.current_interactable = self:getInteractableElement()
@@ -443,17 +444,31 @@ function PixelScene:drawElement(el, shader)
             end
             love.graphics.setShader()
         elseif el.w and el.h and el.w > 0 and el.h > 0 then
+            local ow = el.outline_width or 1
             love.graphics.setColor(1, 1, 1, 1)
-            love.graphics.rectangle("fill", el.x - 1, el.y - 1, el.w + 2, 1)
-            love.graphics.rectangle("fill", el.x - 1, el.y + el.h, el.w + 2, 1)
-            love.graphics.rectangle("fill", el.x - 1, el.y, 1, el.h)
-            love.graphics.rectangle("fill", el.x + el.w, el.y, 1, el.h)
+            love.graphics.rectangle("fill", el.x - ow, el.y - ow, el.w + ow * 2, ow)
+            love.graphics.rectangle("fill", el.x - ow, el.y + el.h, el.w + ow * 2, ow)
+            love.graphics.rectangle("fill", el.x - ow, el.y, ow, el.h)
+            love.graphics.rectangle("fill", el.x + el.w, el.y, ow, el.h)
         end
     end
 
     love.graphics.setColor(1, 1, 1, 1)
     if current_img then
         love.graphics.draw(current_img, el.x, el.y)
+    end
+    if el.color then
+        love.graphics.setColor(el.color[1], el.color[2], el.color[3], el.color[4] or 1)
+        if el.hollow then
+            local line_width = 5
+            love.graphics.rectangle("fill", el.x, el.y, el.w, line_width) -- top
+            love.graphics.rectangle("fill", el.x, el.y + el.h - line_width, el.w, line_width) -- bottom
+            love.graphics.rectangle("fill", el.x, el.y, line_width, el.h) -- left
+            love.graphics.rectangle("fill", el.x + el.w - line_width, el.y, line_width, el.h) -- right
+        else
+            love.graphics.rectangle("fill", el.x, el.y, el.w, el.h)
+        end
+        love.graphics.setColor(1, 1, 1, 1)
     end
     if el.draw then
         el:draw()
