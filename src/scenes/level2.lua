@@ -57,6 +57,7 @@ local desktop = PixelSceneBuilder.new("desktop")
         x = 0,
         y = 0,
         fixed = true,
+        draggable = false,
         z_index = 49,
         sheet = "assets/window_close.ini",
         w = 320,
@@ -235,17 +236,29 @@ local desktop = PixelSceneBuilder.new("desktop")
         z_index = 0,
         x = 406,
         y = 140,
+        canInteract = function(self)
+            return not self.timer
+        end,
         onInteract = function(self)
             AudioManager.musFadeTo(nil, 0, 0)
             self.timer = 2.0
 
-            self.image = "assets/level2/big_wd_o.png"
-            local ok, img = pcall(love.graphics.newImage, self.image)
-            if ok and img then
-                img:setFilter("nearest", "nearest")
-                self.img_obj = img
-                self.w = img:getWidth()
-                self.h = img:getHeight()
+            if not self.closed_img and self.img_obj then
+                self.closed_img = self.img_obj
+            end
+
+            if not self.open_img then
+                local ok, img = pcall(love.graphics.newImage, "assets/level2/big_wd_o.png")
+                if ok and img then
+                    img:setFilter("nearest", "nearest")
+                    self.open_img = img
+                end
+            end
+            if self.open_img then
+                self.img_obj = self.open_img
+                self.image = "assets/level2/big_wd_o.png"
+                self.w = self.open_img:getWidth()
+                self.h = self.open_img:getHeight()
             end
         end,
         update = function(self, dt)
@@ -254,6 +267,20 @@ local desktop = PixelSceneBuilder.new("desktop")
                 if self.timer <= 0 then
                     AudioManager.musFadeTo(nil, 0.8, 0.8)
                     self.timer = nil
+
+                    if not self.closed_img then
+                        local ok, img = pcall(love.graphics.newImage, "assets/level2/big_wd.png")
+                        if ok and img then
+                            img:setFilter("nearest", "nearest")
+                            self.closed_img = img
+                        end
+                    end
+                    if self.closed_img then
+                        self.img_obj = self.closed_img
+                        self.image = "assets/level2/big_wd.png"
+                        self.w = self.closed_img:getWidth()
+                        self.h = self.closed_img:getHeight()
+                    end
                 end
             end
         end
