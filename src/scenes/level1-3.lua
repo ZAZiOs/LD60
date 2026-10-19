@@ -29,6 +29,20 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
         color = {1, 1, 1, 1},
         hollow = true
     })
+    :addElement({
+        id = "path_2",
+        x = 100 + 25, 
+        y = 400 + 10,
+        w = 120, 
+        h = 0,
+        z_index = -10,
+        draw = function(self)
+            love.graphics.setColor(1, 0, 1, 1)
+            love.graphics.setLineWidth(5)
+            love.graphics.line(self.x, self.y, self.x + self.w, self.y)
+            love.graphics.setLineWidth(1)
+        end
+    })
     :addSolid("platform_3", {
         spawn_x = 300,
         spawn_y = 400,
@@ -40,6 +54,20 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
         color = {1, 1, 1, 1},
         hollow = true
     })
+    :addElement({
+        id = "path_3",
+        x = 300 + 25,
+        y = 400 + 10,
+        w = 120, 
+        h = 0,
+        z_index = -10,
+        draw = function(self)
+            love.graphics.setColor(1, 0, 1, 1)
+            love.graphics.setLineWidth(5)
+            love.graphics.line(self.x, self.y, self.x + self.w, self.y)
+            love.graphics.setLineWidth(1)
+        end
+    })
     :addSolid("platform_4", {
         spawn_x = 500,
         spawn_y = 400,
@@ -50,6 +78,20 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
         max_delta_x = 120,
         color = {1, 1, 1, 1},
         hollow = true
+    })
+    :addElement({
+        id = "path_4",
+        x = 500 + 25, 
+        y = 400 + 10, 
+        w = 120, 
+        h = 0,
+        z_index = -10,
+        draw = function(self)
+            love.graphics.setColor(1, 0, 1, 1)
+            love.graphics.setLineWidth(5)
+            love.graphics.line(self.x, self.y, self.x + self.w, self.y)
+            love.graphics.setLineWidth(1)
+        end
     })
     :addSolid("platform_5", {
         x = 700,
