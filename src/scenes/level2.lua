@@ -163,24 +163,25 @@ local desktop = PixelSceneBuilder.new("desktop")
                 id = "facebook_contents",
                 visible = true,
                 draw = function(self, window)
-                    Events.on("level2_kitten", function()
-                        local ok, img = pcall(love.graphics.newImage, "assets/level2/facebook_window_after.png")
-                        if ok and img then
-                            img:setFilter("nearest", "nearest")
-                            self.bg_img = img
-                        end
-                    end)
-
-                    if not self.bg_img then
+                    if not self.img_before then
                         local ok, img = pcall(love.graphics.newImage, "assets/level2/facebook_window.png")
                         if ok and img then
                             img:setFilter("nearest", "nearest")
-                            self.bg_img = img
+                            self.img_before = img
                         end
                     end
-                    if self.bg_img then
+                    if not self.img_after then
+                        local ok, img = pcall(love.graphics.newImage, "assets/level2/facebook_window_after.png")
+                        if ok and img then
+                            img:setFilter("nearest", "nearest")
+                            self.img_after = img
+                        end
+                    end
+
+                    local img = GameState.get("level2_facebook_vandalized") and self.img_after or self.img_before
+                    if img then
                         love.graphics.setColor(1, 1, 1, 1)
-                        love.graphics.draw(self.bg_img, 0, 0)
+                        love.graphics.draw(img, 0, 0)
                     end
                 end
             },
@@ -193,9 +194,13 @@ local desktop = PixelSceneBuilder.new("desktop")
                 visible = true,
 
                 mousepressed = function(self, cx, cy, button)
+                    if not self.visible or GameState.get("level2_facebook_vandalized") then
+                        return false
+                    end
                     if cx >= self.x and cx < self.x + self.w and cy >= self.y and cy < self.y + self.h then
                         Events.emit("level2_kitten")
-                        GameState.set("level2_facebook_vandalized")
+                        GameState.set("level2_facebook_vandalized", true)
+                        self.visible = false
                         return true
                     end
                     return false
