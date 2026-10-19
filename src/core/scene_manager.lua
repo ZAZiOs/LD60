@@ -3,6 +3,7 @@ local Viewport = require("src.core.viewport")
 local unpack_fn = unpack or table.unpack
 
 local SceneManager = {
+    definitions = {},
     scenes = {},
     current_scene = nil,
     current = nil,
@@ -26,24 +27,62 @@ end
 
 function SceneManager.register(name, scene)
     assert(type(name) == "string", "Scene name must be a string")
-    SceneManager.scenes[name] = scene
+    SceneManager.definitions[name] = scene
+    SceneManager.scenes[name] = nil
 end
 
 function SceneManager._resolveTarget(name)
     local target = SceneManager.scenes[name]
     if not target then
-        error(string.format("Scene '%s' is not registered in SceneManager!", tostring(name)))
-    end
-
-    if type(target) == "string" then
-        local ok, loaded_module = pcall(require, target)
-        if not ok then
-            error(string.format("Failed to require scene module '%s' for scene '%s': %s", target, name, tostring(loaded_module)))
+        local def = SceneManager.definitions[name]
+        if not def then
+            error(string.format("Scene '%s' is not registered in SceneManager!", tostring(name)))
         end
-        target = loaded_module
-        SceneManager.scenes[name] = target
+
+        if type(def) == "string" then
+            local ok, loaded_module = pcall(require, def)
+            if not ok then
+                error(string.format("Failed to require scene module '%s' for scene '%s': %s", def, name, tostring(loaded_module)))
+            end
+            target = loaded_module
+            SceneManager.scenes[name] = target
+        elseif type(def) == "function" then
+            target = def()
+            SceneManager.scenes[name] = target
+        else
+            target = def
+            SceneManager.scenes[name] = target
+        end
     end
     return target
+end
+
+function SceneManager.resetScene(name)
+    local def = SceneManager.definitions[name]
+    if def and type(def) == "string" then
+        package.loaded[def] = nil
+    end
+    SceneManager.scenes[name] = nil
+end
+
+function SceneManager.resetGameScenes(except_name)
+    local exc = except_name or "menu"
+    for name, def in pairs(SceneManager.definitions) do
+        if name ~= exc then
+            if type(def) == "string" then
+                package.loaded[def] = nil
+            end
+            SceneManager.scenes[name] = nil
+        end
+    end
+end
+
+function SceneManager.resetGame()
+    local ok, GameState = pcall(require, "src.core.game_state")
+    if ok and GameState and GameState.reset then
+        GameState.reset()
+    end
+    SceneManager.resetGameScenes("menu")
 end
 
 function SceneManager._switchScene(name, ...)
@@ -51,6 +90,10 @@ function SceneManager._switchScene(name, ...)
 
     if SceneManager.current_scene and SceneManager.current_scene.leave then
         SceneManager.current_scene:leave()
+    end
+
+    if name == "menu" then
+        SceneManager.resetGame()
     end
 
     SceneManager.previous_name = SceneManager.current_name
@@ -91,6 +134,10 @@ function SceneManager.crossFade(name, duration, ...)
 
     if SceneManager.current_scene and SceneManager.current_scene.leave then
         SceneManager.current_scene:leave()
+    end
+
+    if name == "menu" then
+        SceneManager.resetGame()
     end
 
     SceneManager.previous_name = SceneManager.current_name

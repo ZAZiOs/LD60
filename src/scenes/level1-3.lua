@@ -5,8 +5,8 @@ local PixelSceneBuilder = require("src.core.pixel_scene_builder")
 local AudioManager = require("src.core.audio_manager")
 local Effects = require("src.core.effects")
 
-ROOM_WIDTH = 950
-ROOM_HEIGHT = 480
+local ROOM_WIDTH = 950
+local ROOM_HEIGHT = 480
 local PLAYER_START_X, PLAYER_START_Y = 50, 340
 
 local desktop = PixelSceneBuilder.new("desktop_level1")
@@ -130,6 +130,13 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
     :onUpdate(function(scene)
         if scene.player and scene.player.y >= ROOM_HEIGHT then
             SceneManager.goTo("level1-3")
+        end
+    end)
+    :onKey(function(self, action, key)
+        if action == "press" then
+            if key == "escape" then
+                SceneManager.goTo("menu")
+            end
         end
     end)
     :build()

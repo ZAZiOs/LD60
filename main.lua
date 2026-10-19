@@ -4,6 +4,7 @@ local AudioManager = require("src.core.audio_manager")
 local Settings = require("src.core.settings")
 local I18n = require("src.core.i18n")
 local Effects = require("src.core.effects")
+local GameState = require("src.core.game_state")
 
 DEBUG = false
 
@@ -23,6 +24,20 @@ function love.load(args)
 
     Settings.init()
     I18n.init()
+    GameState.init({
+        level1_vent_opened = false,
+        level1_crowbar_collected = false,
+        level1_chest_opened = false,
+        level1_key_collected = false,
+        level1_wardrobe_opened = false,
+        level1_note_collected = false,
+        level1_2_door_opened = false,
+        wrong_bookshelves_exploded = 0,
+        correct_bookshelves_exploded = 0,
+        eye_killed = false,
+        is_dead = false,
+        level3_cleared = false
+    })
 
     AudioManager.init()
     Effects.load()

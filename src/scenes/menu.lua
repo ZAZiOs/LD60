@@ -5,6 +5,7 @@ local Effects = require("src.core.effects")
 local I18n = require("src.core.i18n")
 local SpritesheetManager = require("src.core.spritesheet_manager")
 local AudioManager = require("src.core.audio_manager")
+local Settings = require("src.core.settings")
 
 local menu_has_booted = false
 
@@ -66,13 +67,18 @@ local menu_content = {
 
 function menu_content:refreshOptions()
     local start_text = "run"
-
+    local soundcheck_text = "soundcheck"
     local quit_text = "exit"
 
     self.options = {
-        { id = "start", text = start_text },
-        { id = "quit",  text = quit_text }
+        { id = "start", text = start_text }
     }
+
+    if Settings.get("soundcheck_enabled") then
+        table.insert(self.options, { id = "soundcheck", text = soundcheck_text })
+    end
+
+    table.insert(self.options, { id = "quit", text = quit_text })
 end
 
 function menu_content:turnOn()
@@ -85,6 +91,7 @@ end
 
 function menu_content:enter()
     print("Entered Menu")
+    SceneManager.resetGame()
     self.selected = 1
     self.blink_timer = 0
     self.cursor_frame = "cursor"
@@ -144,7 +151,10 @@ function menu_content:confirm()
     local opt = self.options[self.selected]
     if not opt then return end
     if opt.id == "start" then
+        SceneManager.resetGame()
         SceneManager.goTo("level0")
+    elseif opt.id == "soundcheck" then
+        SceneManager.crossFade("soundcheck", 0.4)
     elseif opt.id == "quit" then
         love.event.quit()
     end
@@ -248,8 +258,9 @@ function menu_content:draw()
     local item_w = 150
     local item_h = 22
     local item_x = math.floor((320 - item_w) / 2)
-    local start_y = 96
-    local gap = 10
+    local count = #self.options
+    local start_y = count > 2 and 84 or 96
+    local gap = count > 2 and 8 or 10
 
     self.item_bounds = {}
 

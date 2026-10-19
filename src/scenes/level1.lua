@@ -259,6 +259,13 @@ Sorry, Dad!]],
         y = 224,
         sheet = "assets/rage/rage_sh.ini"
     })
+    :onKey(function(self, action, key)
+        if action == "press" then
+            if key == "escape" then
+                SceneManager.goTo("menu")
+            end
+        end
+    end)
     :build()
 
 local screen = PixelScreen.new({

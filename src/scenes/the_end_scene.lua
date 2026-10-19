@@ -5,6 +5,7 @@ local GameState = require("src.core.game_state")
 local Effects = require("src.core.effects")
 local I18n = require("src.core.i18n")
 local AudioManager = require("src.core.audio_manager")
+local Settings = require("src.core.settings")
 
 local font_title = nil
 local font_regular = nil
@@ -145,6 +146,7 @@ function credits_content:buildSlides()
 end
 
 function credits_content:enter()
+    Settings.set("soundcheck_enabled", true)
     self:buildSlides()
     self.current_index = 1
     self.timer = 0
