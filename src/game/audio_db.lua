@@ -63,7 +63,15 @@ return {
         ["bad_end"] = {
             preloop = "assets/mus/bad_end.ogg",
             volume = 0.8,
-        }
+        },
+        ["good_end_credits"] = {
+            preloop = "assets/mus/credits.ogg",
+            volume = 0.8,
+        },
+        ["bad_end_credits"] = {
+            preloop = "assets/mus/credits.ogg",
+            volume = 0.8,
+        },
     },
 
     -- ========================================================================

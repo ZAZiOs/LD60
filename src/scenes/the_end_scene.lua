@@ -93,6 +93,9 @@ local credits_content = {
     stepped_timer = 0,
     fade_alpha = 0,
 
+    fade_wait_timer = 0,
+    fade_wait_duration = 2.0,
+
     jingle_timer = 0,
     bad_jingle_duration = 15.0,
     good_jingle_duration = 10.0,
@@ -167,10 +170,15 @@ function credits_content:enter()
     self.scroll_y = -240
     self.stepped_timer = 0
     self.fade_alpha = 0
+    self.fade_wait_timer = 0
     self.jingle_timer = 0
     self.disconnect_timer = 0
     self.black_timer = 0
-    AudioManager.musFadeTo("crt", 0.75, 0.5)
+
+    local soundtrack = "_end_credits"
+    if self.is_good_end then soundtrack = "good" .. soundtrack else soundtrack = "bad" .. soundtrack end
+
+    AudioManager.musFadeTo(soundtrack, 0.75, 0.5)
 end
 
 function credits_content:leave()
@@ -179,10 +187,9 @@ end
 
 function credits_content:startEnding()
     if self.state ~= "scroll" then return end
-    AudioManager.musStop(0.3)
-    self.state = "stepped_fade"
-    self.stepped_timer = 0
-    self.fade_alpha = FADE_STEPS[1]
+    AudioManager.musStop(2.0)
+    self.state = "fade_wait"
+    self.fade_wait_timer = 0
 end
 
 function credits_content:startJingle()
@@ -211,6 +218,14 @@ function credits_content:update(dt)
         self.scroll_y = self.scroll_y + cur_speed * dt
         if self.scroll_y >= self.max_scroll_y then
             self:startEnding()
+        end
+
+    elseif self.state == "fade_wait" then
+        self.fade_wait_timer = self.fade_wait_timer + dt
+        if self.fade_wait_timer >= self.fade_wait_duration then
+            self.state = "stepped_fade"
+            self.stepped_timer = 0
+            self.fade_alpha = FADE_STEPS[1]
         end
 
     elseif self.state == "stepped_fade" then
@@ -342,7 +357,7 @@ function credits_content:draw()
     love.graphics.setColor(0, 0, 0, 1)
     love.graphics.rectangle("fill", 0, 0, 320, 240)
 
-    if self.state == "scroll" then
+    if self.state == "scroll" or self.state == "fade_wait" then
         for i, item in ipairs(self.items) do
             local item_y = (i - 1) * 100 - self.scroll_y
             self:drawConditionItem(item, item_y)
@@ -366,6 +381,11 @@ function credits_content:keypressed(key)
     if key == "escape" then
         if self.state == "scroll" then
             self:startEnding()
+        elseif self.state == "fade_wait" then
+            AudioManager.musStop(0)
+            self.state = "stepped_fade"
+            self.stepped_timer = 0
+            self.fade_alpha = FADE_STEPS[1]
         elseif self.state == "stepped_fade" or self.state == "jingle" then
             self:startShutdown()
         elseif self.state == "shutdown" or self.state == "black" then

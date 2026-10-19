@@ -1,71 +1,47 @@
-# tech_plague
+# Mr. Havoc in the Web
 
-A 2D game built with [LÖVE](https://love2d.org/) (Love2D).
+## Hey, buddy!
+### Your name is Havoc. I created you to be the virus that's gonna make some changes in this world for me. You see, there's some data that needs to be destroyed, and it's stored on some corporation's datacenter. 
 
-## Requirements
+# > [Play now on Itch.io!](https://sasikqq.itch.io/mr-havoc)
 
-- [LÖVE](https://love2d.org/) 11.5+ installed and available in your `PATH`.
-- [makelove](https://github.com/pfirsich/makelove) installed and available in your `PATH` (only required for building release packages).
+## About this game
+This is a platformer game with point-n-click elements.
 
-## Running the game
+Mr. Havoc in The Web — a game about little, precious, chaotic virus named Havoc that loves sneaking on people's PCs and making some joy over internet trolling on the web.
 
-From the project root:
+<img src="https://i.imgur.com/DUs0x34.png">
 
-```bash
-love .
-```
+You're hacking into other's PCs just to end your journey at some datacenter that is owned by "ViewTech". Your creator hates it. 
 
-## VS Code
+Discover different realities and people while reaching your final destination!
 
-`.vscode/` contains launch and build configurations.
-- Run/Debug: `Ctrl+Shift+D` -> select **Debug** or **Release**.
-- Build: `Ctrl+Shift+B`.
+<img src="https://i.imgur.com/7DKTo28.png">
 
-## Build Release Packages
+## ...For what?
+Some dude created you to make his things better and yours worse. Why do you even listen to him? Listen to yourself! Make everything you want to! Do funny things and never think about being guilty. At the very least, you're just a virus, so have fun and do not listen to him!
 
-Uses **makelove** for **win64** and **lovejs** targets.
+<img src="https://i.imgur.com/m68QoLa.png">
 
-1. Copy the template and set your LÖVE binary path:
+## How to Play
 
-    ```bash
-    cp make_all.toml.example make_all.toml
-    ```
+<img src="https://i.imgur.com/q5GZZa0.png">
 
-    Edit `make_all.toml`:
+## Credits
+Sasik — Game Design, Vector and Pixel Graphics
 
-    ```toml
-    [win64]
-    love_binaries = "C:/path/to/love2d" # <-- required for win64 builds
-    ```
-    (Note: `make_all.toml` is git-ignored since the path is machine-specific).
+Lazarus — Character Designs and Pixel Graphics
 
-2. Run the build:
+Zakuro — Music
 
-    ```bash
-    makelove --config make_all.toml
-    ```
+ZAZiOs — Main Code and SFX
 
-    Output goes to `bin/` (git-ignored).
+Comprock15 — Graphic Assistance and Platformer Section Code
 
-## Documentation
+imRy0 — Level Section Code and Optimization
 
-- [Core Library Documentation (docs/CORE.md)](docs/CORE.md) — подробное руководство по всем модулям ядра (`src/core/`): сцены, вьюпорт, звук, анимации, локализация, шрифты, шина событий.
+creepy0964 — Level Section Code
 
-## Project Structure
 
-```text
-.
-├── main.lua              # Entry point
-├── conf.lua              # LÖVE config
-├── src/                  # Game source
-│   ├── core/             # Framework modules (see docs/CORE.md)
-│   ├── scenes/           # Game scenes
-│   ├── locales/          # Translations (ru.json, en.json)
-│   └── lib/              # Third-party utilities (json, etc.)
-├── docs/                 # Project documentation
-├── assets/               # Sprites, fonts, audio
-├── .vscode/              # Editor tasks
-├── make_all.toml.example # Local build template
-└── bin/                  # Build output (ignored)
-```
 
+*AI was used solely as a code assistant. Generative AI was not used.*

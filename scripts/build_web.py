@@ -100,7 +100,7 @@ def update_index_html(web_dir: Path, build_ts: int):
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, minimum-scale=1, maximum-scale=1">
-    <title>tech_plague</title>
+    <title>mr_havoc</title>
 
     <script src="coi-serviceworker.js"></script>
     <script type="text/javascript">
@@ -142,7 +142,7 @@ def update_index_html(web_dir: Path, build_ts: int):
 
         loadingContext.font = '22px sans-serif';
         loadingContext.fillStyle = "rgb(255, 255, 255)";
-        loadingContext.fillText("tech_plague", canvas.width / 2, canvas.height / 4);
+        loadingContext.fillText("mr_havoc", canvas.width / 2, canvas.height / 4);
         loadingContext.fillText("Powered by Love2D WebAssembly", canvas.width / 2, (canvas.height / 4) * 3);
       }}
 
@@ -280,14 +280,14 @@ def main():
     build_ts = int(time.time() * 1000)
     package_uuid = str(uuid.uuid4())
     
-    # 1. Сборка game.data и tech_plague.love
+    # 1. Сборка game.data и mr_havoc.love
     game_data_path = web_dir / "game.data"
-    tech_plague_love_path = root_dir / "tech_plague.love"
+    mr_havoc_love_path = root_dir / "mr_havoc.love"
     
     file_size = build_love_archive(root_dir, game_data_path)
-    # Копируем также в корень как tech_plague.love
+    # Копируем также в корень как mr_havoc.love
     import shutil
-    shutil.copy2(game_data_path, tech_plague_love_path)
+    shutil.copy2(game_data_path, mr_havoc_love_path)
     
     # 2. Обновление game.js
     update_game_js(web_dir, file_size, package_uuid)
