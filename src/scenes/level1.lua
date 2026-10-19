@@ -240,6 +240,8 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
         y = 40,
         w = 180,
         h = 120,
+        sheet = "assets/window_me.ini",
+        title_color = { 0, 0, 0, 1 },
         visible = false,
         text = [[Dear Diary,
 
