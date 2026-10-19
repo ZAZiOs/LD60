@@ -42,7 +42,8 @@ function SceneManager._resolveTarget(name)
         if type(def) == "string" then
             local ok, loaded_module = pcall(require, def)
             if not ok then
-                error(string.format("Failed to require scene module '%s' for scene '%s': %s", def, name, tostring(loaded_module)))
+                error(string.format("Failed to require scene module '%s' for scene '%s': %s", def, name,
+                    tostring(loaded_module)))
             end
             target = loaded_module
             SceneManager.scenes[name] = target
