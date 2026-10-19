@@ -673,7 +673,7 @@ local screen = PixelScreen.new({
 })
 
 local Level1Scene = GameScene.new({
-    bg = "assets/bg/intro_bg.png",
+    bg = "assets/bg/bossbg.png",
     screen = screen,
     screen_draw_fn = function(s)
         Effects.drawCrt(s.canvas, s.x, s.y, s.scale_x, s.scale_y)
