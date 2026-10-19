@@ -5,8 +5,8 @@ local PixelSceneBuilder = require("src.core.pixel_scene_builder")
 local AudioManager = require("src.core.audio_manager")
 local Effects = require("src.core.effects")
 
-ROOM_WIDTH = 950
-ROOM_HEIGHT = 480
+local ROOM_WIDTH = 950
+local ROOM_HEIGHT = 480
 local PLAYER_START_X, PLAYER_START_Y = 50, 340
 
 local desktop = PixelSceneBuilder.new("desktop_level1")
@@ -132,6 +132,13 @@ local desktop = PixelSceneBuilder.new("desktop_level1")
             SceneManager.goTo("level1-3")
         end
     end)
+    :onKey(function(self, action, key)
+        if action == "press" then
+            if key == "escape" then
+                SceneManager.goTo("menu")
+            end
+        end
+    end)
     :build()
 
 local screen = PixelScreen.new({
@@ -150,7 +157,7 @@ local Level1Scene = GameScene.new({
         Effects.drawAsciiCrt(s.canvas, s.x, s.y, s.scale_x, s.scale_y)
     end,
     enter = function(self)
-        AudioManager.musFadeTo("cat", 0.2, 0.5, "reverb")
+        AudioManager.musFadeTo("web_havoc", 0.8, 0.2, "reverb")
     end,
     leave = function(self)
         AudioManager.musStop(0.5)

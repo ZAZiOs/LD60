@@ -5,6 +5,7 @@ local GameState = require("src.core.game_state")
 local Effects = require("src.core.effects")
 local I18n = require("src.core.i18n")
 local AudioManager = require("src.core.audio_manager")
+local Settings = require("src.core.settings")
 
 local font_title = nil
 local font_regular = nil
@@ -67,248 +68,280 @@ local function getEyeQuad()
     return eye_quad
 end
 
-local credits_content = {
-    slides = {},
-    current_index = 1,
-    timer = 0,
-    is_transitioning = false,
-    trans_timer = 0,
-    DISPLAY_TIME = 4.2,
-    TRANS_TIME = 0.8,
-    CREDITS_TIME = 10.0
-}
-
 local dev_credits = {
     { title = "Game Design",            name = "Sasik" },
-    { title = "Character Designs",      name = "Lazarus" },
+    { title = "Character Designs",      name = "Lazarus517" },
     { title = "Vector Graphics",        name = "Sasik" },
-    { title = "Pixel Graphics",         name = "Lazarus, Sasik" },
-    { title = "Music",                  name = "Zakuro" },
-    { title = "Main code",              name = "ZAZiOs" },
-    { title = "Shaders and platformer", name = "Comprock15" },
+    { title = "Pixel Graphics",         name = "Lazarus517, Sasik" },
+    { title = "Music",                  name = "Zakuro (тёмыч)" },
+    { title = "Core lib and main code", name = "ZAZiOs" },
+    { title = "Shaders and platformer", name = "comprock15" },
     { title = "Levels building",        name = "imRy0, creepy0964" },
 }
 
-function credits_content:buildSlides()
+local FADE_STEPS = { 0.20, 0.40, 0.60, 0.80, 1.00 }
+local STEP_DURATION = 0.12
+
+local credits_content = {
+    state = "scroll", -- "scroll", "stepped_fade", "jingle", "shutdown", "done"
+    scroll_y = -240,
+    SPEED = 35,
+    max_scroll_y = 810,
+    is_good_end = false,
+    items = {},
+
+    stepped_timer = 0,
+    fade_alpha = 0,
+
+    jingle_timer = 0,
+    bad_jingle_duration = 15.0,
+    good_jingle_duration = 10.0,
+
+    disconnect_timer = 0,
+    disconnect_duration = 0.65,
+
+    black_timer = 0,
+    black_duration = 0.4
+}
+
+function credits_content:initConditions()
     local crowbar = GameState.get("level1_crowbar_collected", false)
     local note = GameState.get("level1_note_collected", false)
     local door_hacked = GameState.get("level1_2_door_opened", false)
+    local correct = GameState.get("correct_bookshelves_exploded", 0)
     local wrong = GameState.get("wrong_bookshelves_exploded", 0)
     local eye_killed = GameState.get("eye_killed", false)
+    local total_shelves = correct + wrong
 
-    self.slides = {
+    -- Good Ending: Killed the eye OR destroyed all 13 bookshelves
+    -- Bad Ending: Exploded at least 1 correct bookshelf and not all bookshelves
+    self.is_good_end = eye_killed or (total_shelves >= 13)
+
+    local archive_title
+    local archive_desc
+    if wrong == 0 then
+        if correct >= 3 then
+            archive_title = "SURGICAL STRIKE"
+            archive_desc = "You destroyed all 3 designated bomb racks with zero collateral damage."
+        elseif correct > 0 then
+            archive_title = "PARTIAL SABOTAGE"
+            archive_desc = string.format("You destroyed %d of 3 designated bomb racks with zero collateral damage.", correct)
+        else
+            archive_title = "UNTOUCHED ARCHIVE"
+            archive_desc = "You slipped past without destroying any designated bomb racks."
+        end
+    else
+        archive_title = "COLLATERAL DAMAGE"
+        if correct >= 3 then
+            archive_desc = string.format("Destroyed all 3 designated bomb racks, but blew up %d wrong bookshelves.", wrong)
+        elseif correct > 0 then
+            archive_desc = string.format("Destroyed %d designated bomb racks and blew up %d wrong bookshelves.", correct, wrong)
+        else
+            archive_desc = string.format("Blew up %d wrong bookshelves without hitting designated racks.", wrong)
+        end
+    end
+
+    self.items = {
         {
-            layout = "img_left",
-            tag = "CHAPTER 01 // SECTOR A",
             title = crowbar and "THE CROWBAR" or "UNTOUCHED VENT",
             desc = crowbar and "You scavenged the rusted crowbar and broke through the vent shaft."
                            or "You slipped past without ever touching the crowbar or the vent.",
             image = crowbar and "assets/level1/fomka.png" or "assets/level1/vent_c.png"
         },
         {
-            layout = "img_right",
-            tag = "CHAPTER 01 // SECRETS",
             title = note and "ENCRYPTED MEMO" or "SEALED CHEST",
             desc = note and "You opened the locked chest and retrieved the hacker's secret note."
                         or "The forgotten chest and its hidden message remained sealed.",
             image = note and "assets/level1/note.png" or "assets/level1/chest_closed.png"
         },
         {
-            layout = "img_left",
-            tag = "CHAPTER 02 // MAINFRAME",
             title = door_hacked and "ROOT OVERRIDE" or "FIREWALL BYPASS",
             desc = door_hacked and "Executed exploit CVE-8921 to override the magnetic gateway."
-                               or "Infiltrated through the secondary security corridor.",
+                                or "Infiltrated through the secondary security corridor.",
             image = door_hacked and "assets/level1/sublv2/terminal_enter.png" or "assets/level1/sublv2/terminal_bg.png"
         },
         {
-            layout = "img_right",
-            tag = "CHAPTER 03 // ARCHIVE",
-            title = (wrong == 0) and "SURGICAL STRIKE" or "COLLATERAL DAMAGE",
-            desc = (wrong == 0) and "You destroyed only the 3 designated bomb racks with zero collateral damage."
-                                or string.format("You blew up %d wrong bookshelves in the heat of the mission.", wrong),
-            image = (wrong == 0) and "assets/level3/bookshelf1.png" or "assets/level3/bookshelf_boom_boom.png"
-        },
-        {
-            layout = "img_left",
-            tag = "CHAPTER 03 // OBSERVER",
             title = eye_killed and "ANTIVIRUS PURGED" or "GHOST PROTOCOL",
-            desc = eye_killed and "You defied all warnings and permanently eliminated the Eye Antivirus."
+            desc = eye_killed and "You permanently eliminated the Eye Antivirus."
                               or "You respected the warnings and slipped past the Eye undetected.",
             image = "assets/level3/eye.png",
             is_eye = true
-        },
-        {
-            is_credits = true
         }
     }
+    self.max_scroll_y = #self.items * 100 + 310
 end
 
 function credits_content:enter()
-    self:buildSlides()
-    self.current_index = 1
-    self.timer = 0
-    self.is_transitioning = false
-    self.trans_timer = 0
-    AudioManager.musFadeTo("crt", 0.75, 0.8)
+    --Settings.set("soundcheck_enabled", true)
+    Settings.set("soundcheck_enabled", false)
+    self:initConditions()
+    self.state = "scroll"
+    self.scroll_y = -240
+    self.stepped_timer = 0
+    self.fade_alpha = 0
+    self.jingle_timer = 0
+    self.disconnect_timer = 0
+    self.black_timer = 0
+    AudioManager.musFadeTo("crt", 0.75, 0.5)
 end
 
 function credits_content:leave()
-    AudioManager.musStop(0.5)
+    AudioManager.musStop(0.3)
 end
 
-function credits_content:startTransition()
-    if self.current_index < #self.slides and not self.is_transitioning then
-        self.is_transitioning = true
-        self.trans_timer = 0
-    end
+function credits_content:startEnding()
+    if self.state ~= "scroll" then return end
+    AudioManager.musStop(0.3)
+    self.state = "stepped_fade"
+    self.stepped_timer = 0
+    self.fade_alpha = FADE_STEPS[1]
 end
 
-function credits_content:nextSlide()
-    local current_slide = self.slides[self.current_index]
-    if current_slide and current_slide.is_credits then
-        SceneManager.crossFade("menu", 0.5)
-        return
+function credits_content:startJingle()
+    if self.state ~= "stepped_fade" then return end
+    self.state = "jingle"
+    self.fade_alpha = 1.0
+    self.jingle_timer = 0
+    local jingle_id = self.is_good_end and "good_end" or "bad_end"
+    AudioManager.musPlay(jingle_id, 0.85)
+end
+
+function credits_content:startShutdown()
+    if self.state == "shutdown" or self.state == "black" or self.state == "done" then return end
+    AudioManager.musStop(0)
+    if AudioManager and AudioManager.sfxPlay then
+        pcall(AudioManager.sfxPlay, "shutdown")
     end
-    if self.current_index < #self.slides then
-        self.is_transitioning = false
-        self.trans_timer = 0
-        self.current_index = self.current_index + 1
-        self.timer = 0
-    end
+    self.state = "shutdown"
+    self.disconnect_timer = 0
 end
 
 function credits_content:update(dt)
-    local current_slide = self.slides[self.current_index]
-    if not current_slide then return end
-
-    if current_slide.is_credits then
-        self.timer = self.timer + dt
-        if self.timer >= self.CREDITS_TIME then
-            SceneManager.crossFade("menu", 0.8)
+    if self.state == "scroll" then
+        local fast = love.keyboard.isDown("space") or love.keyboard.isDown("return") or love.mouse.isDown(1)
+        local cur_speed = fast and (self.SPEED * 4) or self.SPEED
+        self.scroll_y = self.scroll_y + cur_speed * dt
+        if self.scroll_y >= self.max_scroll_y then
+            self:startEnding()
         end
-        return
-    end
 
-    if self.is_transitioning then
-        self.trans_timer = self.trans_timer + dt
-        if self.trans_timer >= self.TRANS_TIME then
-            self.is_transitioning = false
-            self.trans_timer = 0
-            self.current_index = self.current_index + 1
-            self.timer = 0
+    elseif self.state == "stepped_fade" then
+        self.stepped_timer = self.stepped_timer + dt
+        local step_idx = math.floor(self.stepped_timer / STEP_DURATION) + 1
+        if step_idx > #FADE_STEPS then
+            self.fade_alpha = 1.0
+            self:startJingle()
+        else
+            self.fade_alpha = FADE_STEPS[step_idx]
         end
-    else
-        self.timer = self.timer + dt
-        if self.timer >= self.DISPLAY_TIME then
-            self:startTransition()
+
+    elseif self.state == "jingle" then
+        self.jingle_timer = self.jingle_timer + dt
+        local target_duration = self.is_good_end and self.good_jingle_duration or self.bad_jingle_duration
+        if self.jingle_timer >= target_duration then
+            self:startShutdown()
+        end
+
+    elseif self.state == "shutdown" then
+        self.disconnect_timer = self.disconnect_timer + dt
+        if self.disconnect_timer >= self.disconnect_duration then
+            self.state = "black"
+            self.black_timer = 0
+        end
+
+    elseif self.state == "black" then
+        self.black_timer = self.black_timer + dt
+        if self.black_timer >= self.black_duration then
+            self.state = "done"
+            SceneManager.fadeTo("menu", 0.8)
         end
     end
 end
 
-function credits_content:drawSlide(slide, base_y)
-    if not slide then return end
-    if slide.is_credits then
-        self:drawDevCredits(base_y)
-        return
-    end
+function credits_content:drawConditionItem(item, y)
+    if y + 80 < 0 or y > 240 then return end
 
     local f_title = getTitleFont()
     local f_reg = getRegularFont()
     local f_tag = getTagFont()
 
-    local img = getImage(slide.image)
-    local is_left = (slide.layout == "img_left")
-
-    local img_cx = is_left and 75 or 245
-    local img_cy = base_y + 120
-
+    local img = getImage(item.image)
     if img then
-        local max_w = 90
-        local max_h = 100
+        local img_cx = 42
+        local img_cy = y + 36
+        local max_w, max_h = 44, 48
         local scale = 1
         local sw, sh
-        if slide.is_eye then
+        if item.is_eye then
             sw, sh = 48, 48
-            scale = 1.3
-        else
-            sw, sh = img:getDimensions()
-            if sw <= 40 and sh <= 40 then
-                scale = 2
-            elseif sw > max_w or sh > max_h then
-                scale = math.min(max_w / sw, max_h / sh)
-            end
-        end
-
-        local dw = sw * scale
-        local dh = sh * scale
-        local dx = math.floor(img_cx - dw / 2)
-        local dy = math.floor(img_cy - dh / 2)
-
-        love.graphics.setColor(1, 1, 1, 1)
-        if slide.is_eye then
+            scale = 1.0
+            local dw, dh = sw * scale, sh * scale
+            local dx = math.floor(img_cx - dw / 2)
+            local dy = math.floor(img_cy - dh / 2)
+            love.graphics.setColor(1, 1, 1, 1)
             local q = getEyeQuad()
             love.graphics.draw(img, q, dx, dy, 0, scale, scale)
         else
+            sw, sh = img:getDimensions()
+            if sw <= 32 and sh <= 32 then
+                scale = 1.5
+            elseif sw > max_w or sh > max_h then
+                scale = math.min(max_w / sw, max_h / sh)
+            end
+            local dw, dh = sw * scale, sh * scale
+            local dx = math.floor(img_cx - dw / 2)
+            local dy = math.floor(img_cy - dh / 2)
+            love.graphics.setColor(1, 1, 1, 1)
             love.graphics.draw(img, dx, dy, 0, scale, scale)
         end
     end
 
-    local text_x = is_left and 145 or 20
-    local text_w = 155
-    local text_y = base_y + 68
-
-    love.graphics.setFont(f_tag)
-    love.graphics.setColor(0.55, 0.55, 0.55, 1)
-    love.graphics.print(slide.tag or "", text_x, text_y)
+    local tx = 74
+    local tw = 230
 
     love.graphics.setFont(f_title)
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print(slide.title or "", text_x, text_y + 14)
+    love.graphics.print(item.title or "", tx, y + 15)
 
-    love.graphics.setColor(0.35, 0.35, 0.35, 1)
-    love.graphics.line(text_x, text_y + 29, text_x + 36, text_y + 29)
+    love.graphics.setColor(0.35, 0.35, 0.35, 0.8)
+    love.graphics.line(tx, y + 29, tx + 40, y + 29)
 
     love.graphics.setFont(f_reg)
-    love.graphics.setColor(0.9, 0.9, 0.9, 1)
-    love.graphics.printf(slide.desc or "", text_x, text_y + 36, text_w, "left")
+    love.graphics.setColor(0.88, 0.88, 0.88, 1)
+    love.graphics.printf(item.desc or "", tx, y + 33, tw, "left")
 end
 
-function credits_content:drawDevCredits(base_y)
+function credits_content:drawDevCredits(start_y)
     local f_title = getTitleFont()
     local f_reg = getRegularFont()
 
-    local cx = 152
-    local start_y = base_y + 54
-    local line_h = 16
+    local header_y = start_y
+    if header_y >= -20 and header_y <= 240 then
+        love.graphics.setFont(f_title)
+        love.graphics.setColor(1, 1, 1, 1)
+        local header = "THE END"
+        local hw = f_title:getWidth(header)
+        love.graphics.print(header, math.floor((320 - hw) / 2), header_y)
+    end
 
-    love.graphics.setFont(f_title)
-    love.graphics.setColor(1, 1, 1, 1)
-    local header = "THE END"
-    local hw = f_title:getWidth(header)
-    love.graphics.print(header, math.floor((320 - hw) / 2), base_y + 26)
+    local cx = 150
+    local list_start_y = start_y + 24
+    local line_h = 16
 
     love.graphics.setFont(f_reg)
     for i, item in ipairs(dev_credits) do
-        local y = start_y + (i - 1) * line_h
+        local y = list_start_y + (i - 1) * line_h
+        if y >= -16 and y <= 240 then
+            love.graphics.setColor(0.65, 0.65, 0.65, 1)
+            local rw = f_reg:getWidth(item.title)
+            love.graphics.print(item.title, cx - 8 - rw, y)
 
-        love.graphics.setColor(0.68, 0.68, 0.68, 1)
-        local rw = f_reg:getWidth(item.title)
-        love.graphics.print(item.title, cx - 8 - rw, y)
+            love.graphics.setColor(0.3, 0.3, 0.3, 0.8)
+            love.graphics.print("|", cx - 2, y)
 
-        love.graphics.setColor(0.3, 0.3, 0.3, 0.8)
-        love.graphics.print("|", cx - 2, y)
-
-        love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.print(item.name, cx + 8, y)
-    end
-
-    if self.timer >= 4.0 then
-        local alpha = math.min(1.0, (self.timer - 4.0) / 2.0)
-        love.graphics.setColor(0.45, 0.45, 0.45, alpha)
-        local hint = "[ Press ESC to return to menu ]"
-        local tw = f_reg:getWidth(hint)
-        love.graphics.print(hint, math.floor((320 - tw) / 2), base_y + 204)
+            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.print(item.name, cx + 8, y)
+        end
     end
 end
 
@@ -316,42 +349,48 @@ function credits_content:draw()
     love.graphics.setColor(0, 0, 0, 1)
     love.graphics.rectangle("fill", 0, 0, 320, 240)
 
-    local cur = self.slides[self.current_index]
-    if not cur then return end
-
-    if self.is_transitioning then
-        local p = math.min(1.0, self.trans_timer / self.TRANS_TIME)
-        local offset_y = 0
-        if p < 0.22 then
-            local q = p / 0.22
-            offset_y = -14 * math.sin(q * math.pi / 2)
-        else
-            local q = (p - 0.22) / 0.78
-            local ease = q * q * (3 - 2 * q)
-            offset_y = -14 * (1 - ease) + 240 * ease
+    if self.state == "scroll" then
+        for i, item in ipairs(self.items) do
+            local item_y = (i - 1) * 100 - self.scroll_y
+            self:drawConditionItem(item, item_y)
         end
 
-        local nxt = self.slides[self.current_index + 1]
-        self:drawSlide(cur, -offset_y)
-        if nxt then
-            self:drawSlide(nxt, 240 - offset_y)
+        local credits_start_y = (#self.items * 100 + 30) - self.scroll_y
+        self:drawDevCredits(credits_start_y)
+
+    elseif self.state == "stepped_fade" or self.state == "jingle" or self.state == "shutdown" then
+        local img_path = self.is_good_end and "assets/good_end.png" or "assets/bad_end.png"
+        local img = getImage(img_path)
+        if img then
+            local alpha = (self.state == "stepped_fade") and self.fade_alpha or 1.0
+            love.graphics.setColor(1, 1, 1, alpha)
+            love.graphics.draw(img, 0, 0)
         end
-    else
-        self:drawSlide(cur, 0)
     end
 end
 
 function credits_content:keypressed(key)
     if key == "escape" then
-        SceneManager.crossFade("menu", 0.5)
-    elseif key == "space" or key == "return" or key == "right" or key == "e" then
-        self:nextSlide()
+        if self.state == "scroll" then
+            self:startEnding()
+        elseif self.state == "stepped_fade" or self.state == "jingle" then
+            self:startShutdown()
+        elseif self.state == "shutdown" or self.state == "black" then
+            self.state = "done"
+            SceneManager.fadeTo("menu", 0.5)
+        end
+    elseif key == "space" or key == "return" then
+        if self.state == "jingle" then
+            self:startShutdown()
+        end
     end
 end
 
 function credits_content:mousepressed(gx, gy, button)
     if button == 1 or button == 2 then
-        self:nextSlide()
+        if self.state == "jingle" then
+            self:startShutdown()
+        end
     end
 end
 
@@ -364,13 +403,71 @@ local screen = PixelScreen.new({
 })
 
 local TheEndScene = GameScene.new({
-    bg = "assets/bg/intro_bg.png",
+    bg = "assets/bg/the_end_bg.png",
     screen = screen,
     screen_draw_fn = function(s)
-        Effects.drawCrt(s.canvas, s.x, s.y, s.scale_x, s.scale_y)
+        if credits_content.state == "shutdown" then
+            local dur = credits_content.disconnect_duration or 0.65
+            local t_collapse = 0.38
+            local t = credits_content.disconnect_timer or 0
+
+            if t < t_collapse then
+                local p = t / t_collapse
+                p = math.min(1.0, p)
+                local p_eased = p * p * p
+
+                local cur_h = math.max(4, s.h * (1 - p_eased))
+                local cur_y = (s.y + s.h / 2) - cur_h / 2
+                local cur_scale_y = (cur_h / s.h) * s.scale_y
+
+                love.graphics.setColor(0.02, 0.03, 0.04, 1)
+                love.graphics.rectangle("fill", s.x, s.y, s.w, s.h)
+
+                Effects.drawCrt(s.canvas, s.x, cur_y, s.scale_x, cur_scale_y)
+
+                local flash_alpha = p_eased * 0.95
+                if flash_alpha > 0.01 then
+                    love.graphics.setBlendMode("add")
+                    love.graphics.setColor(0.75, 0.9, 1.0, flash_alpha)
+                    love.graphics.rectangle("fill", s.x, cur_y, s.w, cur_h)
+
+                    love.graphics.setColor(1, 1, 1, flash_alpha * 0.9)
+                    love.graphics.rectangle("fill", s.x, s.y + s.h / 2 - 1, s.w, 2)
+                    love.graphics.setBlendMode("alpha")
+                end
+            else
+                local p = (t - t_collapse) / (dur - t_collapse)
+                p = math.min(1.0, math.max(0, p))
+                local p_inv = 1 - p
+                local p_eased = p_inv * p_inv
+
+                local cx = s.x + s.w / 2
+                local cy = s.y + s.h / 2
+                local beam_w = math.max(4, s.w * p_eased)
+
+                love.graphics.setColor(0.02, 0.03, 0.04, 1)
+                love.graphics.rectangle("fill", s.x, s.y, s.w, s.h)
+
+                love.graphics.setColor(0.3, 0.75, 1.0, 0.7 * p_inv)
+                love.graphics.rectangle("fill", cx - beam_w / 2, cy - 4, beam_w, 8)
+
+                love.graphics.setColor(1, 1, 1, p_inv)
+                love.graphics.rectangle("fill", cx - beam_w / 2, cy - 1, beam_w, 2)
+
+                local spot_r = math.max(1, 6 * p_eased)
+                love.graphics.circle("fill", cx, cy, spot_r)
+            end
+        elseif credits_content.state == "black" or credits_content.state == "done" then
+            love.graphics.setColor(0, 0, 0, 1)
+            love.graphics.rectangle("fill", s.x, s.y, s.w, s.h)
+        else
+            Effects.drawCrt(s.canvas, s.x, s.y, s.scale_x, s.scale_y)
+        end
     end,
     on_bg_click = function(self, vx, vy, button)
-        credits_content:nextSlide()
+        if credits_content.state == "jingle" then
+            credits_content:startShutdown()
+        end
     end,
     enter = function(self)
         if credits_content.enter then

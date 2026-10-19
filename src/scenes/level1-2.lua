@@ -265,6 +265,13 @@ desktop = PixelSceneBuilder.new("desktop")
         y = 32,
         sheet = "assets/rage/rage_sh.ini"
     })
+    :onKey(function(self, action, key)
+        if action == "press" then
+            if key == "escape" then
+                SceneManager.goTo("menu")
+            end
+        end
+    end)
     :build()
 
 screen = PixelScreen.new({

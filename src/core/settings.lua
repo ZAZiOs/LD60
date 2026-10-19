@@ -10,7 +10,8 @@ local Settings = {
         muted = false,
         fullscreen = false,
         vsync = true,
-        text_speed = "normal"
+        text_speed = "normal",
+        soundcheck_enabled = false
     },
 
     speed_values = {

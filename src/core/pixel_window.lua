@@ -35,6 +35,41 @@ local function wrapText(font, text, max_w)
     return lines
 end
 
+local function parseColor(c, default)
+    if type(c) == "table" then
+        return { c[1] or 1, c[2] or 1, c[3] or 1, c[4] or 1 }
+    elseif type(c) == "string" then
+        local hex = c:gsub("^#", "")
+        if #hex == 3 then
+            local r = tonumber(hex:sub(1, 1):rep(2), 16) / 255
+            local g = tonumber(hex:sub(2, 2):rep(2), 16) / 255
+            local b = tonumber(hex:sub(3, 3):rep(2), 16) / 255
+            return { r, g, b, 1 }
+        elseif #hex == 6 then
+            local r = tonumber(hex:sub(1, 2), 16) / 255
+            local g = tonumber(hex:sub(3, 4), 16) / 255
+            local b = tonumber(hex:sub(5, 6), 16) / 255
+            return { r, g, b, 1 }
+        elseif #hex == 8 then
+            local r = tonumber(hex:sub(1, 2), 16) / 255
+            local g = tonumber(hex:sub(3, 4), 16) / 255
+            local b = tonumber(hex:sub(5, 6), 16) / 255
+            local a = tonumber(hex:sub(7, 8), 16) / 255
+            return { r, g, b, a }
+        end
+        local lower = c:lower()
+        if lower == "black" then return { 0, 0, 0, 1 }
+        elseif lower == "white" then return { 1, 1, 1, 1 }
+        elseif lower == "red" then return { 1, 0, 0, 1 }
+        elseif lower == "blue" then return { 0, 0, 1, 1 }
+        elseif lower == "green" then return { 0, 1, 0, 1 }
+        elseif lower == "yellow" then return { 1, 1, 0, 1 }
+        elseif lower == "gray" or lower == "grey" then return { 0.5, 0.5, 0.5, 1 }
+        end
+    end
+    return default or { 1, 1, 1, 1 }
+end
+
 function PixelWindow.new(opts)
     opts = opts or {}
     local self = setmetatable({}, PixelWindow)
@@ -52,6 +87,9 @@ function PixelWindow.new(opts)
     self.sheet = SpritesheetManager.getSheet(self.sheet_path)
 
     self.title = opts.title or "Window"
+    local raw_title_color = opts.title_color or opts.titleColor or opts.title_text_color or opts.header_color or opts.title_textColor
+    self.title_color = parseColor(raw_title_color, { 1, 1, 1, 1 })
+
     self.visible = (opts.visible == true)
     self.is_window = true
     self.clickable = (opts.clickable ~= false)
@@ -61,7 +99,23 @@ function PixelWindow.new(opts)
     self.z_index = opts.z_index or (self.fixed and 1050 or 100)
 
     self.closeable = (opts.closeable ~= false)
-    self.draggable = (opts.draggable ~= false)
+
+    if opts.draggable ~= nil then
+        self.draggable = (opts.draggable == true)
+    elseif opts.movable ~= nil then
+        self.draggable = (opts.movable == true)
+    elseif opts.can_drag ~= nil then
+        self.draggable = (opts.can_drag == true)
+    elseif opts.can_move ~= nil then
+        self.draggable = (opts.can_move == true)
+    elseif opts.allow_drag ~= nil then
+        self.draggable = (opts.allow_drag == true)
+    elseif opts.is_draggable ~= nil then
+        self.draggable = (opts.is_draggable == true)
+    else
+        self.draggable = true
+    end
+
     self.onClose = opts.onClose
     self.draw_content = opts.draw_content
     self.on_content_click = opts.on_content_click
@@ -127,6 +181,14 @@ end
 
 function PixelWindow:getElement(id)
     return self.elements_by_id[id]
+end
+
+function PixelWindow:setTitleColor(color)
+    self.title_color = parseColor(color, { 1, 1, 1, 1 })
+end
+
+function PixelWindow:setDraggable(draggable)
+    self.draggable = (draggable ~= false)
 end
 
 function PixelWindow:addButton(opts)
@@ -504,7 +566,8 @@ function PixelWindow:draw()
     local font = self:_getFont()
     if font and self.title and self.title ~= "" then
         love.graphics.setFont(font)
-        love.graphics.setColor(1, 1, 1, 1)
+        local tc = self.title_color or { 1, 1, 1, 1 }
+        love.graphics.setColor(tc[1] or 1, tc[2] or 1, tc[3] or 1, tc[4] or 1)
         local title_limit = self.closeable and (w - 14) or (w - 6)
         local cam_x = (not self.fixed and self.scene and self.scene.camera and self.scene.camera.x) or 0
         local cam_y = (not self.fixed and self.scene and self.scene.camera and self.scene.camera.y) or 0

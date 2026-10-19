@@ -5,6 +5,7 @@ local Effects = require("src.core.effects")
 local I18n = require("src.core.i18n")
 local SpritesheetManager = require("src.core.spritesheet_manager")
 local AudioManager = require("src.core.audio_manager")
+local Settings = require("src.core.settings")
 
 local menu_has_booted = false
 
@@ -59,20 +60,39 @@ local menu_content = {
     mouse_gy = 0,
     mouse_inside = false,
 
-    power_state = "off",     -- "off" | "powering_on" | "on"
+    power_state = "off", -- "off" | "powering_on" | "on"
     power_timer = 0,
     power_duration = 0.32
 }
 
+local function isWeb()
+    if love and love.system and love.system.getOS then
+        if love.system.getOS() == "Web" then
+            return true
+        end
+    end
+    if love and love.filesystem and love.filesystem.getInfo and love.filesystem.getInfo("web_build.flag") then
+        return true
+    end
+    return false
+end
+
 function menu_content:refreshOptions()
     local start_text = "run"
-
+    local soundcheck_text = "soundcheck"
     local quit_text = "exit"
 
     self.options = {
-        { id = "start", text = start_text },
-        { id = "quit",  text = quit_text }
+        { id = "start", text = start_text }
     }
+
+    if Settings.get("soundcheck_enabled") then
+        table.insert(self.options, { id = "soundcheck", text = soundcheck_text })
+    end
+
+    if not isWeb() then
+        table.insert(self.options, { id = "quit", text = quit_text })
+    end
 end
 
 function menu_content:turnOn()
@@ -85,6 +105,7 @@ end
 
 function menu_content:enter()
     print("Entered Menu")
+    SceneManager.resetGame()
     self.selected = 1
     self.blink_timer = 0
     self.cursor_frame = "cursor"
@@ -144,7 +165,10 @@ function menu_content:confirm()
     local opt = self.options[self.selected]
     if not opt then return end
     if opt.id == "start" then
+        SceneManager.resetGame()
         SceneManager.goTo("level0")
+    elseif opt.id == "soundcheck" then
+        SceneManager.crossFade("soundcheck", 0.4)
     elseif opt.id == "quit" then
         love.event.quit()
     end
@@ -248,8 +272,9 @@ function menu_content:draw()
     local item_w = 150
     local item_h = 22
     local item_x = math.floor((320 - item_w) / 2)
-    local start_y = 96
-    local gap = 10
+    local count = #self.options
+    local start_y = count > 2 and 84 or 96
+    local gap = count > 2 and 8 or 10
 
     self.item_bounds = {}
 
@@ -326,7 +351,6 @@ local MenuScene = GameScene.new({
             local tw = f:getWidth(txt) * scale
             local th = f:getHeight() * scale
             love.graphics.print(txt, s.x + math.floor((s.w - tw) / 2), s.y + math.floor((s.h - th) / 2), 0, scale, scale)
-
         elseif menu_content.power_state == "powering_on" then
             local t = menu_content.power_timer
             local dur = menu_content.power_duration
@@ -355,7 +379,6 @@ local MenuScene = GameScene.new({
                 -- Central bright spark
                 local spot_r = 5 * (1 - p) + 1
                 love.graphics.circle("fill", cx, cy, spot_r)
-
             else
                 -- Phase 2: Vertical expansion of the CRT screen
                 local p = (t - t_beam) / (dur - t_beam)
@@ -408,4 +431,3 @@ local MenuScene = GameScene.new({
 })
 
 return MenuScene
-
