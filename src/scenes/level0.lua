@@ -29,7 +29,7 @@ local desktop = PixelSceneBuilder.new("desktop")
         y = 112,
         z_index = 2,
         onInteract = function(self)
-            SceneManager.crossFade("level2", 0.4)
+            SceneManager.crossFade("level1", 0.4)
         end
     })
     :addTooltip("tooltip_readme", {
