@@ -10,6 +10,68 @@ local Events = require("src.core.events")
 local ROOM_WIDTH = 540
 local ROOM_HEIGHT = 240
 
+local CLOCK_SEGMENTS = {
+    a = function(dx, dy)
+        love.graphics.rectangle("fill", dx + 2, dy + 0, 7, 1)
+        love.graphics.rectangle("fill", dx + 3, dy + 1, 5, 1)
+    end,
+    b = function(dx, dy)
+        love.graphics.rectangle("fill", dx + 10, dy + 1, 1, 1)
+        love.graphics.rectangle("fill", dx + 9,  dy + 2, 2, 5)
+        love.graphics.rectangle("fill", dx + 10, dy + 7, 1, 1)
+    end,
+    c = function(dx, dy)
+        love.graphics.rectangle("fill", dx + 10, dy + 9,  1, 1)
+        love.graphics.rectangle("fill", dx + 9,  dy + 10, 2, 5)
+        love.graphics.rectangle("fill", dx + 10, dy + 15, 1, 1)
+    end,
+    d = function(dx, dy)
+        love.graphics.rectangle("fill", dx + 3, dy + 15, 5, 1)
+        love.graphics.rectangle("fill", dx + 2, dy + 16, 7, 1)
+    end,
+    e = function(dx, dy)
+        love.graphics.rectangle("fill", dx + 0, dy + 9,  1, 1)
+        love.graphics.rectangle("fill", dx + 0, dy + 10, 2, 5)
+        love.graphics.rectangle("fill", dx + 0, dy + 15, 1, 1)
+    end,
+    f = function(dx, dy)
+        love.graphics.rectangle("fill", dx + 0, dy + 1, 1, 1)
+        love.graphics.rectangle("fill", dx + 0, dy + 2, 2, 5)
+        love.graphics.rectangle("fill", dx + 0, dy + 7, 1, 1)
+    end,
+    g = function(dx, dy)
+        love.graphics.rectangle("fill", dx + 2, dy + 8, 7, 1)
+        love.graphics.rectangle("fill", dx + 3, dy + 9, 5, 1)
+    end,
+}
+
+local CLOCK_PATTERNS = {
+    [0] = { a = true, b = true, c = true, d = true, e = true, f = true },
+    [1] = { b = true, c = true },
+    [2] = { a = true, b = true, g = true, e = true, d = true },
+    [3] = { a = true, b = true, g = true, c = true, d = true },
+    [4] = { f = true, g = true, b = true, c = true },
+    [5] = { a = true, f = true, g = true, c = true, d = true },
+    [6] = { a = true, f = true, g = true, e = true, c = true, d = true },
+    [7] = { a = true, b = true, c = true },
+    [8] = { a = true, b = true, c = true, d = true, e = true, f = true, g = true },
+    [9] = { a = true, b = true, c = true, d = true, f = true, g = true },
+}
+
+local SEG_NAMES = { "a", "b", "c", "d", "e", "f", "g" }
+
+local function draw7SegmentDigit(digit, dx, dy)
+    local pat = CLOCK_PATTERNS[digit] or CLOCK_PATTERNS[0]
+    for _, name in ipairs(SEG_NAMES) do
+        if pat[name] then
+            love.graphics.setColor(1, 0, 0, 1)
+        else
+            love.graphics.setColor(0.18, 0, 0, 1)
+        end
+        CLOCK_SEGMENTS[name](dx, dy)
+    end
+end
+
 local desktop = PixelSceneBuilder.new("desktop")
     :background("assets/level2/wp.png")
     :cursor("assets/cursor.ini")
@@ -20,25 +82,58 @@ local desktop = PixelSceneBuilder.new("desktop")
         x = 0,
         y = 0,
         collisions = {
-            -- stairs, vertical
-            { x = 143, y = 173, w = 1,   h = 24 },
-            { x = 116, y = 149, w = 1,   h = 24 },
-            { x = 89,  y = 125, w = 1,   h = 24 },
-            { x = 62,  y = 101, w = 1,   h = 24 },
+            -- stairs (one-way)
+            { x = 144, y = 198, w = 24,  h = 1, one_way = true },
+            { x = 117, y = 174, w = 24,  h = 1, one_way = true },
+            { x = 90,  y = 150, w = 24,  h = 1, one_way = true },
+            { x = 63,  y = 126, w = 24,  h = 1, one_way = true },
+            { x = 1,   y = 100, w = 63,  h = 1, one_way = true },
 
-            -- stairs, horizontal
-            { x = 144, y = 198, w = 24,  h = 1 },
-            { x = 117, y = 174, w = 24,  h = 1 },
-            { x = 90,  y = 150, w = 24,  h = 1 },
-            { x = 63,  y = 126, w = 24,  h = 1 },
-            { x = 1,   y = 100, w = 63,  h = 1 },
-
-            -- table
-            { x = 198, y = 181, w = 80,  h = 1 },
+            -- table (one-way)
+            { x = 198, y = 181, w = 80,  h = 1, one_way = true },
 
             -- 2rd floor
             { x = 116, y = 100, w = 424, h = 1 }
         }
+    })
+
+    :addElement({
+        id = "digital_clock",
+        z_index = 51,
+        x = 12,
+        y = 14,
+        w = 76,
+        h = 21,
+        clickable = false,
+        draw = function(self)
+            love.graphics.setColor(0, 0, 0, 1)
+            love.graphics.rectangle("fill", 12, 14, 76, 21)
+
+            local t = os.date("*t")
+            local h = t.hour or 0
+            local m = t.min or 0
+            local s = t.sec or 0
+
+            local d1 = math.floor(h / 10)
+            local d2 = h % 10
+            local d3 = math.floor(m / 10)
+            local d4 = m % 10
+
+            draw7SegmentDigit(d1, 21, 16)
+            draw7SegmentDigit(d2, 34, 16)
+            draw7SegmentDigit(d3, 55, 16)
+            draw7SegmentDigit(d4, 68, 16)
+
+            if s % 2 == 0 then
+                love.graphics.setColor(1, 0, 0, 1)
+            else
+                love.graphics.setColor(0.18, 0, 0, 1)
+            end
+            love.graphics.rectangle("fill", 49, 20, 2, 2)
+            love.graphics.rectangle("fill", 49, 28, 2, 2)
+
+            love.graphics.setColor(1, 1, 1, 1)
+        end
     })
 
     :addElement({
@@ -306,7 +401,7 @@ local desktop = PixelSceneBuilder.new("desktop")
     :addTab("lore_note", {
         idle = "assets/level2/card_idle.png",
         active = "assets/level2/card_c.png",
-        x = 190,
+        x = 192,
         y = 226,
         visible = false,
         onClick = function(self)
@@ -388,7 +483,10 @@ local desktop = PixelSceneBuilder.new("desktop")
         w = 180,
         h = 120,
         visible = false,
-        text = [[key card is behind the wardrobe]],
+        text =
+        [[soo i deleted all of my important notes here because dude from the security department said that it's not secure to store them here                  i will leave only the passkey to the administrator permissions behind the drawer right after the stairs
+
+i mean it's not that seriouss!]],
         onClose = function(self)
             local tab = self.scene:getElement("card_note")
             if tab then
