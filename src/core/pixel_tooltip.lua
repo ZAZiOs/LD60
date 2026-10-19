@@ -8,8 +8,10 @@ function PixelTooltip.new(opts)
     local self = setmetatable({}, PixelTooltip)
 
     self.id = opts.id or "tooltip"
+    self.is_tooltip = true
     self.text = opts.text or ""
     self.visible = (opts.visible ~= false)
+    self.fixed = (opts.fixed ~= false)
     self.z_index = opts.z_index or 2000
     self.clickable = (opts.clickable ~= false)
     self.onClick = opts.onClick
@@ -20,6 +22,7 @@ function PixelTooltip.new(opts)
 
     self.bg_color = opts.bg_color or { 1, 1, 1, 1 }
     self.text_color = opts.text_color or { 0, 0, 0, 1 }
+    self.border_color = opts.border_color or { 0, 0, 0, 1 }
 
     self.target_id = opts.target_id or opts.target
     self.target_x = opts.target_x
@@ -41,12 +44,17 @@ end
 
 function PixelTooltip:_getFont()
     if self.font then return self.font end
-    if I18n and I18n.fonts and I18n.fonts.tahoma9 then
-        return I18n.fonts.tahoma9
-    end
     if I18n and I18n.getFont then
-        local f = I18n.getFont("tahoma9")
-        if f then return f end
+        local ok, f = pcall(I18n.getFont, {
+            path = "assets/fnt/tahoma.ttf",
+            size = 9,
+            hinting = "mono",
+            filter = "nearest"
+        })
+        if ok and f then
+            self.font = f
+            return f
+        end
     end
     if love and love.graphics and love.graphics.newFont then
         local ok, f = pcall(love.graphics.newFont, "assets/fnt/tahoma.ttf", 9, "mono")
@@ -107,8 +115,19 @@ function PixelTooltip:draw()
         if self.target_id and self.scene then
             local target = self.scene:getElement(self.target_id)
             if target and target.visible then
-                tx = target.x + (self.target_anchor_x or 2)
-                ty = target.y + (self.target_anchor_y or 0)
+                local cam_x = (self.scene.camera and self.scene.camera.x) or 0
+                local cam_y = (self.scene.camera and self.scene.camera.y) or 0
+                local tgt_x = target.x
+                local tgt_y = target.y
+                if self.fixed and not target.fixed then
+                    tgt_x = tgt_x - cam_x
+                    tgt_y = tgt_y - cam_y
+                elseif not self.fixed and target.fixed then
+                    tgt_x = tgt_x + cam_x
+                    tgt_y = tgt_y + cam_y
+                end
+                tx = tgt_x + (self.target_anchor_x or 2)
+                ty = tgt_y + (self.target_anchor_y or 0)
             end
         end
     end
@@ -118,17 +137,25 @@ function PixelTooltip:draw()
     local bw = self.box_w
     local bh = self.box_h
 
-    if tx and ty then
-        local t_left = bx + (self.tail_offset_x or 26)
-        local t_right = t_left + (self.tail_width or 7)
-        local b_bottom = by + bh
+    local has_tail = (tx ~= nil and ty ~= nil)
+    local t_left, t_right, b_bottom
+    if has_tail then
+        local t_w = self.tail_width or 7
+        local t_off = self.tail_offset_x
+        if not t_off then
+            t_off = math.floor(bw * 0.7)
+        elseif t_off < 0 then
+            t_off = bw + t_off - t_w
+        end
+        t_left = bx + t_off
+        t_right = t_left + t_w
+        b_bottom = by + bh - 1
 
+        -- Fill tail
         love.graphics.setColor(self.bg_color)
         love.graphics.polygon("fill",
             t_left, b_bottom,
-            t_left, b_bottom + 4,
             tx, ty,
-            tx + 1, ty,
             t_right, b_bottom
         )
     end

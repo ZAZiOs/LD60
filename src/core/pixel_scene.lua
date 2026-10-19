@@ -194,6 +194,9 @@ function PixelScene:addElement(elem)
         elem.is_tab = true
         elem.fixed = true
         elem.z_index = elem.z_index or 1010
+    elseif elem.is_tooltip then
+        if elem.fixed == nil then elem.fixed = true end
+        elem.z_index = elem.z_index or 2000
     end
 
     elem.z_index = elem.z_index or 0

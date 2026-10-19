@@ -10,7 +10,10 @@ local Events = require("src.core.events")
 local ROOM_WIDTH = 540
 local ROOM_HEIGHT = 240
 
-local desktop = PixelSceneBuilder.new("desktop")
+local tip_timer = 6.0
+
+local desktop
+desktop = PixelSceneBuilder.new("desktop")
     :background("assets/level2/wp.png")
     :cursor("assets/cursor.ini")
     :setRoomBounds(ROOM_WIDTH, ROOM_HEIGHT)
@@ -426,6 +429,49 @@ local desktop = PixelSceneBuilder.new("desktop")
         y = 224,
         sheet = "assets/rage/rage_sh.ini"
     })
+    :addElement({
+        id = "tray_exclamation",
+        image = "assets/exclamation_xp.png",
+        x = 300,
+        y = 226,
+        fixed = true,
+        z_index = 1005,
+        clickable = true,
+        onClick = function(self)
+            self.visible = false
+            local tip = self.scene and self.scene:getElement("tooltip_exclamation")
+            if tip then tip.visible = false end
+        end
+    })
+    :addTooltip("tooltip_exclamation", {
+        text = "Find the admin\nkey card and leave\nthe room\nhint: check yourspace \non the desk",
+        target = "tray_exclamation",
+        target_anchor_x = 5,
+        target_anchor_y = 0,
+        x = 190,
+        y = 156,
+        tail_offset_x = 90,
+        tail_width = 8,
+        fixed = true,
+        z_index = 2000,
+        onClick = function(self)
+            self.visible = false
+            local icon = self.scene and self.scene:getElement("tray_exclamation")
+            if icon then icon.visible = false end
+        end
+    })
+    :onUpdate(function(sc, dt)
+        local delta = dt or 0
+        if tip_timer > 0 then
+            tip_timer = tip_timer - delta
+            if tip_timer <= 0 then
+                local icon = sc and sc:getElement("tray_exclamation")
+                if icon then icon.visible = false end
+                local tip = sc and sc:getElement("tooltip_exclamation")
+                if tip then tip.visible = false end
+            end
+        end
+    end)
     :build()
 
 local screen = PixelScreen.new({
@@ -444,6 +490,11 @@ local Level1Scene = GameScene.new({
     end,
     enter = function(self)
         AudioManager.musFadeTo("mr_boss", 0.8, 0.5)
+        tip_timer = 6.0
+        local icon = desktop and desktop:getElement("tray_exclamation")
+        if icon then icon.visible = true end
+        local tip = desktop and desktop:getElement("tooltip_exclamation")
+        if tip then tip.visible = true end
     end,
     leave = function(self)
         AudioManager.musStop(0.5)

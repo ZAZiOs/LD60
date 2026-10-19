@@ -73,6 +73,7 @@ local eye_notification_timer = 0
 local restart_timer = 0
 local exit_unlocked = false
 local last_music_is_hidden = false
+local tip_timer = 6.0
 
 local disconnect_state = "none" -- "none", "shutting_down", "disconnected", "turning_on"
 local disconnect_timer = 0
@@ -256,6 +257,38 @@ desktop = PixelSceneBuilder.new("desktop_level3")
         h = 16,
         fixed = true,
         z_index = 1000
+    })
+
+    :addElement({
+        id = "tray_exclamation",
+        image = "assets/exclamation_xp.png",
+        x = 300,
+        y = 226,
+        fixed = true,
+        z_index = 1005,
+        clickable = true,
+        onClick = function(self)
+            self.visible = false
+            local tip = self.scene and self.scene:getElement("tooltip_exclamation")
+            if tip then tip.visible = false end
+        end
+    })
+    :addTooltip("tooltip_exclamation", {
+        text = "README carefully!!!!!!!\nAND STICK TO IT!!!!!!!!!!!",
+        target = "tray_exclamation",
+        target_anchor_x = 5,
+        target_anchor_y = 0,
+        x = 190,
+        y = 186,
+        tail_offset_x = 70,
+        tail_width = 8,
+        fixed = true,
+        z_index = 2000,
+        onClick = function(self)
+            self.visible = false
+            local icon = self.scene and self.scene:getElement("tray_exclamation")
+            if icon then icon.visible = false end
+        end
     })
 
     :addTab("tab_readme", {
@@ -519,6 +552,17 @@ DO!!!!!!! NOT!!!!!! TOUCH!!!!! IT!!!!!!!! IN!!!! ANY!!!!! CASE!!!!!!!]],
     })
 
     :onUpdate(function(self, dt)
+        local delta = dt or 0
+        if tip_timer > 0 then
+            tip_timer = tip_timer - delta
+            if tip_timer <= 0 then
+                local icon = self and self:getElement("tray_exclamation")
+                if icon then icon.visible = false end
+                local tip = self and self:getElement("tooltip_exclamation")
+                if tip then tip.visible = false end
+            end
+        end
+
         if disconnect_state ~= "none" or eye_caught_state ~= "none" then
             return
         end
@@ -991,8 +1035,14 @@ local function resetLevelState()
     eye.is_dead = false
     eye.exploding = false
     eye.explode_timer = 0
+    tip_timer = 6.0
 
     if desktop then
+        local icon = desktop:getElement("tray_exclamation")
+        if icon then icon.visible = true end
+        local tip = desktop:getElement("tooltip_exclamation")
+        if tip then tip.visible = true end
+
         desktop:setElementVisible("window_readme", false)
         desktop:setElementActive("tab_readme", false)
         desktop:setElementVisible("tab_scanner", false)

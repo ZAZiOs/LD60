@@ -6,7 +6,10 @@ local AudioManager = require("src.core.audio_manager")
 local Effects = require("src.core.effects")
 local GameState = require("src.core.game_state")
 
-local desktop = PixelSceneBuilder.new("desktop_level1")
+local tip_timer = 6.0
+
+local desktop
+desktop = PixelSceneBuilder.new("desktop_level1")
     :background("assets/level1/wp.png")
     :cursor("assets/cursor.ini")
     :addSolid("taskbar", {
@@ -261,6 +264,49 @@ Sorry, Dad!]],
         y = 224,
         sheet = "assets/rage/rage_sh.ini"
     })
+    :addElement({
+        id = "tray_exclamation",
+        image = "assets/exclamation_me.png",
+        x = 300,
+        y = 226,
+        fixed = true,
+        z_index = 1005,
+        clickable = true,
+        onClick = function(self)
+            self.visible = false
+            local tip = self.scene and self.scene:getElement("tooltip_exclamation")
+            if tip then tip.visible = false end
+        end
+    })
+    :addTooltip("tooltip_exclamation", {
+        text = "exit this room as soon\nas possible. explore it\nto find the exit",
+        target = "tray_exclamation",
+        target_anchor_x = 5,
+        target_anchor_y = 0,
+        x = 194,
+        y = 172,
+        tail_offset_x = 88,
+        tail_width = 8,
+        fixed = true,
+        z_index = 2000,
+        onClick = function(self)
+            self.visible = false
+            local icon = self.scene and self.scene:getElement("tray_exclamation")
+            if icon then icon.visible = false end
+        end
+    })
+    :onUpdate(function(sc, dt)
+        local delta = dt or 0
+        if tip_timer > 0 then
+            tip_timer = tip_timer - delta
+            if tip_timer <= 0 then
+                local icon = sc and sc:getElement("tray_exclamation")
+                if icon then icon.visible = false end
+                local tip = sc and sc:getElement("tooltip_exclamation")
+                if tip then tip.visible = false end
+            end
+        end
+    end)
     :onKey(function(self, action, key)
         if action == "press" then
             if key == "escape" then
@@ -286,6 +332,11 @@ local Level1Scene = GameScene.new({
     end,
     enter = function(self)
         AudioManager.musFadeTo("cat", 0.8, 0.5, "base")
+        tip_timer = 6.0
+        local icon = desktop:getElement("tray_exclamation")
+        if icon then icon.visible = true end
+        local tip = desktop:getElement("tooltip_exclamation")
+        if tip then tip.visible = true end
     end,
     leave = function(self)
         AudioManager.musStop(0.5)
