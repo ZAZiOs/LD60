@@ -81,6 +81,12 @@ return {
             volume = 0.8,
             pitch = 1.0,
             pitch_variance = 0,
+        },
+        ["coin"] = {
+            path = "assets/sfx/coin_obtained.ogg",
+            volume = 0.8,
+            pitch = 1.0,
+            pitch_variance = 0,
         }
     }
 }
