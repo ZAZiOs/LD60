@@ -83,6 +83,26 @@ local eye_caught_state = "none" -- "none", "targeting"
 local eye_caught_timer = 0
 local eye_caught_exploded = false
 local triggerRetry = nil
+local Level3Scene = nil
+
+local bg_normal_img = nil
+local bg_emergency_img = nil
+
+local function getNormalBg()
+    if not bg_normal_img then
+        local ok, img = pcall(love.graphics.newImage, "assets/bg/level3_bg.png")
+        if ok and img then bg_normal_img = img end
+    end
+    return bg_normal_img
+end
+
+local function getEmergencyBg()
+    if not bg_emergency_img then
+        local ok, img = pcall(love.graphics.newImage, "assets/bg/level3_emergency.png")
+        if ok and img then bg_emergency_img = img end
+    end
+    return bg_emergency_img
+end
 
 local font_retry = nil
 local function getRetryFont()
@@ -136,7 +156,8 @@ local function getExclamationImg()
 end
 
 local function checkDoorUnlock()
-    if eye and (eye.is_dead or GameState.get("eye_killed", false)) then
+    local correct = GameState.get("correct_bookshelves_exploded", 0)
+    if (correct >= TOTAL_BOMBS) or (eye and (eye.is_dead or GameState.get("eye_killed", false))) then
         local d_exit = desktop and desktop:getElement("door_exit")
         if d_exit then
             d_exit.visible = true
@@ -153,6 +174,15 @@ local function triggerFirstExplosion(is_loud)
         first_explosion_done = true
         countdown_active = true
         countdown_timer = 40.0
+
+        if Level3Scene and Level3Scene.setBg then
+            local em = getEmergencyBg()
+            if em then
+                Level3Scene:setBg(em)
+            else
+                Level3Scene:setBg("assets/bg/level3_emergency.png")
+            end
+        end
 
         if AudioManager and AudioManager.musFadeTo then
             AudioManager.musFadeTo("data_run", 0.7, 0.4)
@@ -924,6 +954,15 @@ desktop.draw = function(self, shader)
 end
 
 local function resetLevelState()
+    if Level3Scene and Level3Scene.setBg then
+        local norm = getNormalBg()
+        if norm then
+            Level3Scene:setBg(norm)
+        else
+            Level3Scene:setBg("assets/bg/level3_bg.png")
+        end
+    end
+
     AudioManager.musFadeTo("data", 0.7, 0.5)
     last_music_is_hidden = false
     GameState.set("wrong_bookshelves_exploded", 0)
@@ -1037,7 +1076,7 @@ triggerRetry = function()
     end
 end
 
-local Level3Scene = GameScene.new({
+Level3Scene = GameScene.new({
     bg = "assets/bg/level3_bg.png",
     screen = screen,
     update = function(self, dt)

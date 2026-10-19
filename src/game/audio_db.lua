@@ -49,6 +49,14 @@ return {
             preloop = "assets/mus/web_havoc_preloop.ogg",
             loop = "assets/mus/web_havoc_loop.ogg",
             volume = 0.8,
+        },
+        ["good_end"] = {
+            preloop = "assets/mus/good_end.ogg",
+            volume = 0.8,
+        },
+        ["bad_end"] = {
+            preloop = "assets/mus/bad_end.ogg",
+            volume = 0.8,
         }
     },
 

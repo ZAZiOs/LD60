@@ -65,6 +65,18 @@ local menu_content = {
     power_duration = 0.32
 }
 
+local function isWeb()
+    if love and love.system and love.system.getOS then
+        if love.system.getOS() == "Web" then
+            return true
+        end
+    end
+    if love and love.filesystem and love.filesystem.getInfo and love.filesystem.getInfo("web_build.flag") then
+        return true
+    end
+    return false
+end
+
 function menu_content:refreshOptions()
     local start_text = "run"
     local soundcheck_text = "soundcheck"
@@ -78,7 +90,9 @@ function menu_content:refreshOptions()
         table.insert(self.options, { id = "soundcheck", text = soundcheck_text })
     end
 
-    table.insert(self.options, { id = "quit", text = quit_text })
+    if not isWeb() then
+        table.insert(self.options, { id = "quit", text = quit_text })
+    end
 end
 
 function menu_content:turnOn()

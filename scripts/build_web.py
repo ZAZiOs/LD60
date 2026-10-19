@@ -41,6 +41,9 @@ def build_love_archive(root_dir: Path, output_path: Path):
             else:
                 print(f"  ! Warning: {root_file} not found!")
 
+        # Маркер веб-версии
+        zip_file.writestr("web_build.flag", "1")
+
         # 2. Папки src и assets
         for folder in ['src', 'assets']:
             folder_path = root_dir / folder

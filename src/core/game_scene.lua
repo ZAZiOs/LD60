@@ -34,9 +34,23 @@ function GameScene:_loadBg()
         if ok and img then
             self.bg_image = img
         end
-    elseif type(self.bg_path) == "userdata" then
+    elseif type(self.bg_path) == "userdata" or (type(self.bg_path) == "table" and self.bg_path.typeOf) then
         self.bg_image = self.bg_path
     end
+end
+
+function GameScene:setBg(path_or_image)
+    if type(path_or_image) == "userdata" or (type(path_or_image) == "table" and path_or_image.typeOf) then
+        self.bg_image = path_or_image
+    else
+        self.bg_path = path_or_image
+        self.bg_image = nil
+        self:_loadBg()
+    end
+end
+
+function GameScene:setBackground(path_or_image)
+    self:setBg(path_or_image)
 end
 
 function GameScene:enter(...)
