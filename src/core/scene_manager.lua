@@ -4,6 +4,7 @@ local unpack_fn = unpack or table.unpack
 
 local SceneManager = {
     scenes = {},
+    registered_modules = {},
     current_scene = nil,
     current = nil,
     current_name = nil,
@@ -27,6 +28,27 @@ end
 function SceneManager.register(name, scene)
     assert(type(name) == "string", "Scene name must be a string")
     SceneManager.scenes[name] = scene
+    if type(scene) == "string" then
+        SceneManager.registered_modules[name] = scene
+    end
+end
+
+function SceneManager.resetGame()
+    local ok, GameState = pcall(require, "src.core.game_state")
+    if ok and GameState then
+        if GameState.reset then
+            GameState.reset()
+        elseif GameState.clear then
+            GameState.clear()
+        end
+    end
+
+    for name, module_path in pairs(SceneManager.registered_modules) do
+        if name ~= "menu" and type(module_path) == "string" then
+            package.loaded[module_path] = nil
+            SceneManager.scenes[name] = module_path
+        end
+    end
 end
 
 function SceneManager._resolveTarget(name)

@@ -84,6 +84,7 @@ function menu_content:turnOn()
 end
 
 function menu_content:enter()
+    SceneManager.resetGame()
     print("Entered Menu")
     self.selected = 1
     self.blink_timer = 0
@@ -144,6 +145,7 @@ function menu_content:confirm()
     local opt = self.options[self.selected]
     if not opt then return end
     if opt.id == "start" then
+        SceneManager.resetGame()
         SceneManager.goTo("level0")
     elseif opt.id == "quit" then
         love.event.quit()
