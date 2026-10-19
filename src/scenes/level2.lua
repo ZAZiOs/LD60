@@ -21,23 +21,23 @@ local desktop = PixelSceneBuilder.new("desktop")
         y = 0,
         collisions = {
             -- stairs, vertical
-            {x = 143, y = 173, w = 1, h = 24},
-            {x = 116, y = 149, w = 1, h = 24},
-            {x = 89, y = 125, w = 1, h = 24},
-            {x = 62, y = 101, w = 1, h = 24},
-    
+            { x = 143, y = 173, w = 1,   h = 24 },
+            { x = 116, y = 149, w = 1,   h = 24 },
+            { x = 89,  y = 125, w = 1,   h = 24 },
+            { x = 62,  y = 101, w = 1,   h = 24 },
+
             -- stairs, horizontal
-            {x = 144, y = 198, w = 24, h = 1},
-            {x = 117, y = 174, w = 24, h = 1},
-            {x = 90, y = 150, w = 24, h = 1},
-            {x = 63, y = 126, w = 24, h = 1},
-            {x = 1, y = 100, w = 63, h = 1},
+            { x = 144, y = 198, w = 24,  h = 1 },
+            { x = 117, y = 174, w = 24,  h = 1 },
+            { x = 90,  y = 150, w = 24,  h = 1 },
+            { x = 63,  y = 126, w = 24,  h = 1 },
+            { x = 1,   y = 100, w = 63,  h = 1 },
 
             -- table
-            {x = 198, y = 181, w = 80, h = 1},
+            { x = 198, y = 181, w = 80,  h = 1 },
 
             -- 2rd floor
-            {x = 116, y = 100, w = 424, h = 1}
+            { x = 116, y = 100, w = 424, h = 1 }
         }
     })
 
@@ -96,14 +96,14 @@ local desktop = PixelSceneBuilder.new("desktop")
                 w = 206,
                 h = 17,
                 visible = true,
-                
+
                 mousepressed = function(self, cx, cy, button)
                     if cx >= self.x and cx < self.x + self.w and cy >= self.y and cy < self.y + self.h then
                         Events.emit("level2_kitten")
                         GameState.set("level2_facebook_vandalized")
-                        return true 
+                        return true
                     end
-                    return false  
+                    return false
                 end
             },
         }
@@ -116,27 +116,28 @@ local desktop = PixelSceneBuilder.new("desktop")
         x = 167,
         y = 57,
         canInteract = function(self)
-            return not GameState.get("level2_wardrobe_moved") 
+            return not GameState.get("level2_wardrobe_moved")
         end,
         onInteract = function(self)
             if not GameState.get("level2_folder_collected") then
-                if GameState.get("level2_doc_collected") then
-                    return
-                end
                 self.image = "assets/level2/wardrobe_open.png"
-                local ok, img = pcall(love.graphics.newImage, self.image)
-                if ok and img then
-                    img:setFilter("nearest", "nearest")
-                    self.img_obj = img
-                    self.w = img:getWidth()
-                    self.h = img:getHeight()
+                if not self.open_img then
+                    local ok, img = pcall(love.graphics.newImage, self.image)
+                    if ok and img then
+                        img:setFilter("nearest", "nearest")
+                        self.open_img = img
+                    end
                 end
-                self.scene:getElement("doc").visible = true
-                self.interactable = false
+                if self.open_img then
+                    self.img_obj = self.open_img
+                    self.w = self.open_img:getWidth()
+                    self.h = self.open_img:getHeight()
+                end
             else
                 GameState.set("level2_wardrobe_moved", true)
                 self.x = self.x - 24
                 self.scene:getElement("card").visible = true
+                self.scene:getElement("doc").visible = true
             end
         end
     })
@@ -160,7 +161,7 @@ local desktop = PixelSceneBuilder.new("desktop")
                     self.h = img:getHeight()
                 end
             end
-        
+
             if self.my_img then
                 love.graphics.setColor(1, 1, 1, 1)
                 if self.flipped then
@@ -189,7 +190,7 @@ local desktop = PixelSceneBuilder.new("desktop")
                     self.h = img:getHeight()
                 end
             end
-        
+
             if self.my_img then
                 love.graphics.setColor(1, 1, 1, 1)
                 if self.flipped then
@@ -218,7 +219,7 @@ local desktop = PixelSceneBuilder.new("desktop")
                     self.h = img:getHeight()
                 end
             end
-        
+
             if self.my_img then
                 love.graphics.setColor(1, 1, 1, 1)
                 if self.flipped then
@@ -303,9 +304,9 @@ local desktop = PixelSceneBuilder.new("desktop")
     })
 
     :addTab("lore_note", {
-        idle = "assets/level2/lore_idle.png",
-        active = "assets/level2/lore_c.png",
-        x = 62,
+        idle = "assets/level2/card_idle.png",
+        active = "assets/level2/card_c.png",
+        x = 190,
         y = 226,
         visible = false,
         onClick = function(self)
@@ -324,7 +325,8 @@ local desktop = PixelSceneBuilder.new("desktop")
         w = 180,
         h = 120,
         visible = false,
-        text = [[New text]],
+        text =
+        [[I used to use this card as a credit card, but then I thought the gold plastic looked really smart, so I attached a payment terminal to the entrance to the cellar. Every time I go down to the cellar now, it costs me 30 dollars!]],
         onClose = function(self)
             local tab = self.scene:getElement("lore_note")
             if tab then
@@ -336,7 +338,7 @@ local desktop = PixelSceneBuilder.new("desktop")
     :addTab("pdf_text", {
         idle = "assets/level2/folder_tab_idle.png",
         active = "assets/level2/folder_tab_c.png",
-        x = 126,
+        x = 62,
         y = 226,
         visible = false,
         onClick = function(self)
@@ -364,9 +366,9 @@ local desktop = PixelSceneBuilder.new("desktop")
     })
 
     :addTab("card_note", {
-        idle = "assets/level2/card_idle.png",
-        active = "assets/level2/card_c.png",
-        x = 190,
+        idle = "assets/level2/lore_idle.png",
+        active = "assets/level2/lore_c.png",
+        x = 126,
         y = 226,
         visible = false,
         onClick = function(self)
@@ -380,7 +382,7 @@ local desktop = PixelSceneBuilder.new("desktop")
         end
     })
     :addWindow("card_window", {
-        title = "cardinfo",
+        title = "impo_note",
         x = 56,
         y = 40,
         w = 180,
