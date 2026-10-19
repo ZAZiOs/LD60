@@ -12,6 +12,68 @@ local ROOM_HEIGHT = 240
 
 local tip_timer = 6.0
 
+local CLOCK_SEGMENTS = {
+    a = function(dx, dy)
+        love.graphics.rectangle("fill", dx + 2, dy + 0, 7, 1)
+        love.graphics.rectangle("fill", dx + 3, dy + 1, 5, 1)
+    end,
+    b = function(dx, dy)
+        love.graphics.rectangle("fill", dx + 10, dy + 1, 1, 1)
+        love.graphics.rectangle("fill", dx + 9,  dy + 2, 2, 5)
+        love.graphics.rectangle("fill", dx + 10, dy + 7, 1, 1)
+    end,
+    c = function(dx, dy)
+        love.graphics.rectangle("fill", dx + 10, dy + 9,  1, 1)
+        love.graphics.rectangle("fill", dx + 9,  dy + 10, 2, 5)
+        love.graphics.rectangle("fill", dx + 10, dy + 15, 1, 1)
+    end,
+    d = function(dx, dy)
+        love.graphics.rectangle("fill", dx + 3, dy + 15, 5, 1)
+        love.graphics.rectangle("fill", dx + 2, dy + 16, 7, 1)
+    end,
+    e = function(dx, dy)
+        love.graphics.rectangle("fill", dx + 0, dy + 9,  1, 1)
+        love.graphics.rectangle("fill", dx + 0, dy + 10, 2, 5)
+        love.graphics.rectangle("fill", dx + 0, dy + 15, 1, 1)
+    end,
+    f = function(dx, dy)
+        love.graphics.rectangle("fill", dx + 0, dy + 1, 1, 1)
+        love.graphics.rectangle("fill", dx + 0, dy + 2, 2, 5)
+        love.graphics.rectangle("fill", dx + 0, dy + 7, 1, 1)
+    end,
+    g = function(dx, dy)
+        love.graphics.rectangle("fill", dx + 2, dy + 8, 7, 1)
+        love.graphics.rectangle("fill", dx + 3, dy + 9, 5, 1)
+    end,
+}
+
+local CLOCK_PATTERNS = {
+    [0] = { a = true, b = true, c = true, d = true, e = true, f = true },
+    [1] = { b = true, c = true },
+    [2] = { a = true, b = true, g = true, e = true, d = true },
+    [3] = { a = true, b = true, g = true, c = true, d = true },
+    [4] = { f = true, g = true, b = true, c = true },
+    [5] = { a = true, f = true, g = true, c = true, d = true },
+    [6] = { a = true, f = true, g = true, e = true, c = true, d = true },
+    [7] = { a = true, b = true, c = true },
+    [8] = { a = true, b = true, c = true, d = true, e = true, f = true, g = true },
+    [9] = { a = true, b = true, c = true, d = true, f = true, g = true },
+}
+
+local SEG_NAMES = { "a", "b", "c", "d", "e", "f", "g" }
+
+local function draw7SegmentDigit(digit, dx, dy)
+    local pat = CLOCK_PATTERNS[digit] or CLOCK_PATTERNS[0]
+    for _, name in ipairs(SEG_NAMES) do
+        if pat[name] then
+            love.graphics.setColor(1, 0, 0, 1)
+        else
+            love.graphics.setColor(0.18, 0, 0, 1)
+        end
+        CLOCK_SEGMENTS[name](dx, dy)
+    end
+end
+
 local desktop
 desktop = PixelSceneBuilder.new("desktop")
     :background("assets/level2/wp.png")
@@ -23,25 +85,58 @@ desktop = PixelSceneBuilder.new("desktop")
         x = 0,
         y = 0,
         collisions = {
-            -- stairs, vertical
-            {x = 143, y = 173, w = 1, h = 24},
-            {x = 116, y = 149, w = 1, h = 24},
-            {x = 89, y = 125, w = 1, h = 24},
-            {x = 62, y = 101, w = 1, h = 24},
-    
-            -- stairs, horizontal
-            {x = 144, y = 198, w = 24, h = 1},
-            {x = 117, y = 174, w = 24, h = 1},
-            {x = 90, y = 150, w = 24, h = 1},
-            {x = 63, y = 126, w = 24, h = 1},
-            {x = 1, y = 100, w = 63, h = 1},
+            -- stairs (one-way)
+            { x = 144, y = 198, w = 24,  h = 1, one_way = true },
+            { x = 117, y = 174, w = 24,  h = 1, one_way = true },
+            { x = 90,  y = 150, w = 24,  h = 1, one_way = true },
+            { x = 63,  y = 126, w = 24,  h = 1, one_way = true },
+            { x = 1,   y = 100, w = 63,  h = 1, one_way = true },
 
-            -- table
-            {x = 198, y = 181, w = 80, h = 1},
+            -- table (one-way)
+            { x = 198, y = 181, w = 80,  h = 1, one_way = true },
 
             -- 2rd floor
-            {x = 116, y = 100, w = 424, h = 1}
+            { x = 116, y = 100, w = 424, h = 1 }
         }
+    })
+
+    :addElement({
+        id = "digital_clock",
+        z_index = 51,
+        x = 12,
+        y = 14,
+        w = 76,
+        h = 21,
+        clickable = false,
+        draw = function(self)
+            love.graphics.setColor(0, 0, 0, 1)
+            love.graphics.rectangle("fill", 12, 14, 76, 21)
+
+            local t = os.date("*t")
+            local h = t.hour or 0
+            local m = t.min or 0
+            local s = t.sec or 0
+
+            local d1 = math.floor(h / 10)
+            local d2 = h % 10
+            local d3 = math.floor(m / 10)
+            local d4 = m % 10
+
+            draw7SegmentDigit(d1, 21, 16)
+            draw7SegmentDigit(d2, 34, 16)
+            draw7SegmentDigit(d3, 55, 16)
+            draw7SegmentDigit(d4, 68, 16)
+
+            if s % 2 == 0 then
+                love.graphics.setColor(1, 0, 0, 1)
+            else
+                love.graphics.setColor(0.18, 0, 0, 1)
+            end
+            love.graphics.rectangle("fill", 49, 20, 2, 2)
+            love.graphics.rectangle("fill", 49, 28, 2, 2)
+
+            love.graphics.setColor(1, 1, 1, 1)
+        end
     })
 
     :addElement({
@@ -60,6 +155,7 @@ desktop = PixelSceneBuilder.new("desktop")
         x = 0,
         y = 0,
         fixed = true,
+        draggable = false,
         z_index = 49,
         sheet = "assets/window_close.ini",
         w = 320,
@@ -70,24 +166,25 @@ desktop = PixelSceneBuilder.new("desktop")
                 id = "facebook_contents",
                 visible = true,
                 draw = function(self, window)
-                    Events.on("level2_kitten", function()
-                        local ok, img = pcall(love.graphics.newImage, "assets/level2/facebook_window_after.png")
-                        if ok and img then
-                            img:setFilter("nearest", "nearest")
-                            self.bg_img = img
-                        end
-                    end)
-
-                    if not self.bg_img then
+                    if not self.img_before then
                         local ok, img = pcall(love.graphics.newImage, "assets/level2/facebook_window.png")
                         if ok and img then
                             img:setFilter("nearest", "nearest")
-                            self.bg_img = img
+                            self.img_before = img
                         end
                     end
-                    if self.bg_img then
+                    if not self.img_after then
+                        local ok, img = pcall(love.graphics.newImage, "assets/level2/facebook_window_after.png")
+                        if ok and img then
+                            img:setFilter("nearest", "nearest")
+                            self.img_after = img
+                        end
+                    end
+
+                    local img = GameState.get("level2_facebook_vandalized") and self.img_after or self.img_before
+                    if img then
                         love.graphics.setColor(1, 1, 1, 1)
-                        love.graphics.draw(self.bg_img, 0, 0)
+                        love.graphics.draw(img, 0, 0)
                     end
                 end
             },
@@ -98,14 +195,18 @@ desktop = PixelSceneBuilder.new("desktop")
                 w = 206,
                 h = 17,
                 visible = true,
-                
+
                 mousepressed = function(self, cx, cy, button)
+                    if not self.visible or GameState.get("level2_facebook_vandalized") then
+                        return false
+                    end
                     if cx >= self.x and cx < self.x + self.w and cy >= self.y and cy < self.y + self.h then
                         Events.emit("level2_kitten")
-                        GameState.set("level2_facebook_vandalized")
-                        return true 
+                        GameState.set("level2_facebook_vandalized", true)
+                        self.visible = false
+                        return true
                     end
-                    return false  
+                    return false
                 end
             },
         }
@@ -118,27 +219,28 @@ desktop = PixelSceneBuilder.new("desktop")
         x = 167,
         y = 57,
         canInteract = function(self)
-            return not GameState.get("level2_wardrobe_moved") 
+            return not GameState.get("level2_wardrobe_moved")
         end,
         onInteract = function(self)
             if not GameState.get("level2_folder_collected") then
-                if GameState.get("level2_doc_collected") then
-                    return
-                end
                 self.image = "assets/level2/wardrobe_open.png"
-                local ok, img = pcall(love.graphics.newImage, self.image)
-                if ok and img then
-                    img:setFilter("nearest", "nearest")
-                    self.img_obj = img
-                    self.w = img:getWidth()
-                    self.h = img:getHeight()
+                if not self.open_img then
+                    local ok, img = pcall(love.graphics.newImage, self.image)
+                    if ok and img then
+                        img:setFilter("nearest", "nearest")
+                        self.open_img = img
+                    end
                 end
-                self.scene:getElement("doc").visible = true
-                self.interactable = false
+                if self.open_img then
+                    self.img_obj = self.open_img
+                    self.w = self.open_img:getWidth()
+                    self.h = self.open_img:getHeight()
+                end
             else
                 GameState.set("level2_wardrobe_moved", true)
                 self.x = self.x - 24
                 self.scene:getElement("card").visible = true
+                self.scene:getElement("doc").visible = true
             end
         end
     })
@@ -162,7 +264,7 @@ desktop = PixelSceneBuilder.new("desktop")
                     self.h = img:getHeight()
                 end
             end
-        
+
             if self.my_img then
                 love.graphics.setColor(1, 1, 1, 1)
                 if self.flipped then
@@ -191,7 +293,7 @@ desktop = PixelSceneBuilder.new("desktop")
                     self.h = img:getHeight()
                 end
             end
-        
+
             if self.my_img then
                 love.graphics.setColor(1, 1, 1, 1)
                 if self.flipped then
@@ -220,7 +322,7 @@ desktop = PixelSceneBuilder.new("desktop")
                     self.h = img:getHeight()
                 end
             end
-        
+
             if self.my_img then
                 love.graphics.setColor(1, 1, 1, 1)
                 if self.flipped then
@@ -238,17 +340,29 @@ desktop = PixelSceneBuilder.new("desktop")
         z_index = 0,
         x = 406,
         y = 140,
+        canInteract = function(self)
+            return not self.timer
+        end,
         onInteract = function(self)
             AudioManager.musFadeTo(nil, 0, 0)
             self.timer = 2.0
 
-            self.image = "assets/level2/big_wd_o.png"
-            local ok, img = pcall(love.graphics.newImage, self.image)
-            if ok and img then
-                img:setFilter("nearest", "nearest")
-                self.img_obj = img
-                self.w = img:getWidth()
-                self.h = img:getHeight()
+            if not self.closed_img and self.img_obj then
+                self.closed_img = self.img_obj
+            end
+
+            if not self.open_img then
+                local ok, img = pcall(love.graphics.newImage, "assets/level2/big_wd_o.png")
+                if ok and img then
+                    img:setFilter("nearest", "nearest")
+                    self.open_img = img
+                end
+            end
+            if self.open_img then
+                self.img_obj = self.open_img
+                self.image = "assets/level2/big_wd_o.png"
+                self.w = self.open_img:getWidth()
+                self.h = self.open_img:getHeight()
             end
         end,
         update = function(self, dt)
@@ -257,6 +371,20 @@ desktop = PixelSceneBuilder.new("desktop")
                 if self.timer <= 0 then
                     AudioManager.musFadeTo(nil, 0.8, 0.8)
                     self.timer = nil
+
+                    if not self.closed_img then
+                        local ok, img = pcall(love.graphics.newImage, "assets/level2/big_wd.png")
+                        if ok and img then
+                            img:setFilter("nearest", "nearest")
+                            self.closed_img = img
+                        end
+                    end
+                    if self.closed_img then
+                        self.img_obj = self.closed_img
+                        self.image = "assets/level2/big_wd.png"
+                        self.w = self.closed_img:getWidth()
+                        self.h = self.closed_img:getHeight()
+                    end
                 end
             end
         end
@@ -279,9 +407,9 @@ desktop = PixelSceneBuilder.new("desktop")
     })
 
     :addTab("lore_note", {
-        idle = "assets/level2/lore_idle.png",
-        active = "assets/level2/lore_c.png",
-        x = 62,
+        idle = "assets/level2/card_idle.png",
+        active = "assets/level2/card_c.png",
+        x = 192,
         y = 226,
         visible = false,
         onClick = function(self)
@@ -300,7 +428,8 @@ desktop = PixelSceneBuilder.new("desktop")
         w = 180,
         h = 120,
         visible = false,
-        text = [[New text]],
+        text =
+        [[I used to use this card as a credit card, but then I thought the gold plastic looked really smart, so I attached a payment terminal to the entrance to the cellar. Every time I go down to the cellar now, it costs me 30 dollars!]],
         onClose = function(self)
             local tab = self.scene:getElement("lore_note")
             if tab then
@@ -312,7 +441,7 @@ desktop = PixelSceneBuilder.new("desktop")
     :addTab("pdf_text", {
         idle = "assets/level2/folder_tab_idle.png",
         active = "assets/level2/folder_tab_c.png",
-        x = 126,
+        x = 62,
         y = 226,
         visible = false,
         onClick = function(self)
@@ -340,9 +469,9 @@ desktop = PixelSceneBuilder.new("desktop")
     })
 
     :addTab("card_note", {
-        idle = "assets/level2/card_idle.png",
-        active = "assets/level2/card_c.png",
-        x = 190,
+        idle = "assets/level2/lore_idle.png",
+        active = "assets/level2/lore_c.png",
+        x = 126,
         y = 226,
         visible = false,
         onClick = function(self)
@@ -356,13 +485,16 @@ desktop = PixelSceneBuilder.new("desktop")
         end
     })
     :addWindow("card_window", {
-        title = "cardinfo",
+        title = "impo_note",
         x = 56,
         y = 40,
         w = 180,
         h = 120,
         visible = false,
-        text = [[key card is behind the wardrobe]],
+        text =
+        [[soo i deleted all of my important notes here because dude from the security department said that it's not secure to store them here                  i will leave only the passkey to the administrator permissions behind the drawer right after the stairs
+
+i mean it's not that seriouss!]],
         onClose = function(self)
             local tab = self.scene:getElement("card_note")
             if tab then

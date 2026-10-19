@@ -217,8 +217,10 @@ function Player:update(dt, scene)
     end
 
     local carried_x = 0
+    local carried_y = 0
     if self.ground_platform and self.is_grounded then
         carried_x = self.ground_platform.x - (self.ground_platform.previous_x or self.ground_platform.x)
+        carried_y = self.ground_platform.y - (self.ground_platform.previous_y or self.ground_platform.y)
     end
     self.ground_platform = nil
 
@@ -354,7 +356,7 @@ function Player:update(dt, scene)
     local fall_speed = self.vy
 
     local prev_y = self.y
-    self.y = self.y + self.vy * dt
+    self.y = self.y + carried_y + self.vy * dt
     self.is_grounded = false
 
     local landed_y = nil
