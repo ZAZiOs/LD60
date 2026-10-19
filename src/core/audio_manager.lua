@@ -31,21 +31,28 @@ local function safe_new_source(path, source_type)
     if not path or path == "" then return nil end
 
     if not love.filesystem.getInfo(path) then
-
-        if not path:match("%.%w+$") then
-            local try_ogg = path .. ".ogg"
-            local try_mp3 = path .. ".mp3"
-            local try_wav = path .. ".wav"
-            if love.filesystem.getInfo(try_ogg) then
-                path = try_ogg
-            elseif love.filesystem.getInfo(try_mp3) then
-                path = try_mp3
-            elseif love.filesystem.getInfo(try_wav) then
-                path = try_wav
-            else
-                print(string.format("[AudioManager] Warning: Audio file not found: %s", path))
-                return nil
+        local candidates = {
+            path .. ".ogg",
+            path .. ".mp3",
+            path .. ".wav",
+            "assets/sfx/" .. path,
+            "assets/sfx/" .. path .. ".ogg",
+            "assets/sfx/" .. path .. ".mp3",
+            "assets/sfx/" .. path .. ".wav",
+            "assets/mus/" .. path,
+            "assets/mus/" .. path .. ".ogg",
+            "assets/mus/" .. path .. ".mp3",
+            "assets/mus/" .. path .. ".wav"
+        }
+        local found = nil
+        for _, c in ipairs(candidates) do
+            if love.filesystem.getInfo(c) then
+                found = c
+                break
             end
+        end
+        if found then
+            path = found
         else
             print(string.format("[AudioManager] Warning: Audio file not found: %s", path))
             return nil

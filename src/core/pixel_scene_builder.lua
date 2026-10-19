@@ -243,7 +243,7 @@ function PixelSceneBuilder:addBookshelf(id, opts)
 
         local AudioManager = require("src.core.audio_manager")
         if AudioManager and AudioManager.sfxPlay then
-            AudioManager.sfxPlay("explosion", 1.0, 1.0)
+            pcall(AudioManager.sfxPlay, "explosion", 0.5)
         end
 
         local GameState = require("src.core.game_state")

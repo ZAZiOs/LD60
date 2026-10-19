@@ -30,7 +30,13 @@ return {
         ["mr_boss"] = {
             preloop = "assets/mus/mr_boss_preloop.ogg",
             loop = "assets/mus/mr_boss_loop.ogg",
-            volume = 0.8
+            volume = 0.8,
+            fx = {
+                reverb = {
+                    preloop = "assets/mus/mr_boss_preloop_reverb.ogg",
+                    loop = "assets/mus/mr_boss_loop_reverb.ogg",
+                }
+            }
         },
         ["data"] = {
             preloop = "assets/mus/data_calm_preloop.ogg",
@@ -83,10 +89,16 @@ return {
             pitch_variance = 0,
         },
         ["coin"] = {
-            path = "assets/sfx/coin_obtained.ogg",
+            path = "assets/sfx/coin_collected.ogg",
             volume = 0.8,
             pitch = 1.0,
             pitch_variance = 0,
+        },
+        ["explosion"] = {
+            path = "assets/sfx/explosion.ogg",
+            volume = 0.5,
+            pitch = 1.0,
+            pitch_variance = 0.25,
         }
     }
 }

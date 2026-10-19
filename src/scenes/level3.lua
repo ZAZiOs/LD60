@@ -239,7 +239,7 @@ local function detonateEye()
         desktop:shakeCamera(0.6, 7)
     end
     if AudioManager and AudioManager.sfxPlay then
-        pcall(AudioManager.sfxPlay, "explosion")
+        pcall(AudioManager.sfxPlay, "explosion", 0.7)
     end
     checkDoorUnlock()
 end
@@ -416,7 +416,7 @@ desktop = PixelSceneBuilder.new("desktop_level3")
         unlocked = false,
         onInteract = function(self)
             if self.unlocked or exit_unlocked then
-                SceneManager.crossFade("level4", 0.4)
+                SceneManager.crossFade("the_end", 0.4)
             end
         end,
         onClick = function(self)
@@ -1150,7 +1150,7 @@ Level3Scene = GameScene.new({
                     desktop:shakeCamera(0.8, 10)
                 end
                 if AudioManager and AudioManager.sfxPlay then
-                    pcall(AudioManager.sfxPlay, "explosion")
+                    pcall(AudioManager.sfxPlay, "explosion", 0.7)
                 end
             end
 

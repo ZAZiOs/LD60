@@ -32,6 +32,13 @@ function love.load(args)
         level1_wardrobe_opened = false,
         level1_note_collected = false,
         level1_2_door_opened = false,
+        level2_2_door_opened = false,
+        level2_3_coin_collected = false,
+        level2_pic1_flipped = false,
+        level2_pic2_flipped = false,
+        level2_pic3_flipped = false,
+        level2_closet_opened = false,
+        level2_facebook_vandalized = false,
         wrong_bookshelves_exploded = 0,
         correct_bookshelves_exploded = 0,
         eye_killed = false,
@@ -48,12 +55,11 @@ function love.load(args)
     SceneManager.register("level1-2", "src.scenes.level1-2")
     SceneManager.register("level1-3", "src.scenes.level1-3")
     SceneManager.register("level2", "src.scenes.level2")
+    SceneManager.register("level2-2", "src.scenes.level2-2")
     SceneManager.register("level2-3", "src.scenes.level2-3")
     SceneManager.register("level3", "src.scenes.level3")
-    SceneManager.register("level4", "src.scenes.the_end_scene")
     SceneManager.register("the_end", "src.scenes.the_end_scene")
     SceneManager.register("gameover", "src.scenes.gameover")
-    SceneManager.register("soundcheck", "src.scenes.soundcheck")
 
     if DEBUG then
         SceneManager.register("test_camera", "src.scenes.test_camera")
@@ -96,15 +102,15 @@ function love.keypressed(key, scancode, isrepeat)
         -- Rooms for debug
         local debug_rooms = { 
             "menu", 
-            "soundcheck", 
             "level0", 
             "level1", 
             "level1-2", 
             "level1-3", 
             "level2", 
+            "level2-2",
             "level2-3", 
             "level3", 
-            "level4" 
+            "the_end" 
         }
         
         -- Current index
