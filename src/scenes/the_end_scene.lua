@@ -93,8 +93,33 @@ function credits_content:buildSlides()
     local crowbar = GameState.get("level1_crowbar_collected", false)
     local note = GameState.get("level1_note_collected", false)
     local door_hacked = GameState.get("level1_2_door_opened", false)
+    local correct = GameState.get("correct_bookshelves_exploded", 0)
     local wrong = GameState.get("wrong_bookshelves_exploded", 0)
     local eye_killed = GameState.get("eye_killed", false)
+
+    local archive_title
+    local archive_desc
+    if wrong == 0 then
+        if correct >= 3 then
+            archive_title = "SURGICAL STRIKE"
+            archive_desc = "You destroyed all 3 designated bomb racks with zero collateral damage."
+        elseif correct > 0 then
+            archive_title = "PARTIAL SABOTAGE"
+            archive_desc = string.format("You destroyed %d of 3 designated bomb racks with zero collateral damage.", correct)
+        else
+            archive_title = "UNTOUCHED ARCHIVE"
+            archive_desc = "You slipped past without destroying any of the designated bomb racks."
+        end
+    else
+        archive_title = "COLLATERAL DAMAGE"
+        if correct >= 3 then
+            archive_desc = string.format("You destroyed all 3 designated bomb racks, but blew up %d wrong bookshelves.", wrong)
+        elseif correct > 0 then
+            archive_desc = string.format("You destroyed %d of 3 designated bomb racks and blew up %d wrong bookshelves.", correct, wrong)
+        else
+            archive_desc = string.format("You blew up %d wrong bookshelves without hitting any designated bomb racks.", wrong)
+        end
+    end
 
     self.slides = {
         {
@@ -118,15 +143,14 @@ function credits_content:buildSlides()
             tag = "CHAPTER 02 // MAINFRAME",
             title = door_hacked and "ROOT OVERRIDE" or "FIREWALL BYPASS",
             desc = door_hacked and "Executed exploit CVE-8921 to override the magnetic gateway."
-                               or "Infiltrated through the secondary security corridor.",
+                                or "Infiltrated through the secondary security corridor.",
             image = door_hacked and "assets/level1/sublv2/terminal_enter.png" or "assets/level1/sublv2/terminal_bg.png"
         },
         {
             layout = "img_right",
             tag = "CHAPTER 03 // ARCHIVE",
-            title = (wrong == 0) and "SURGICAL STRIKE" or "COLLATERAL DAMAGE",
-            desc = (wrong == 0) and "You destroyed only the 3 designated bomb racks with zero collateral damage."
-                                or string.format("You blew up %d wrong bookshelves in the heat of the mission.", wrong),
+            title = archive_title,
+            desc = archive_desc,
             image = (wrong == 0) and "assets/level3/bookshelf1.png" or "assets/level3/bookshelf_boom_boom.png"
         },
         {
