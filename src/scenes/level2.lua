@@ -74,6 +74,19 @@ local function draw7SegmentDigit(digit, dx, dy)
     end
 end
 
+local function isImpoNoteOpened(sc)
+    if GameState.get("level2_impo_note_opened") then
+        return true
+    end
+    if sc then
+        local win = sc:getElement("card_window")
+        if win and win.visible then
+            return true
+        end
+    end
+    return false
+end
+
 local desktop
 desktop = PixelSceneBuilder.new("desktop")
     :background("assets/level2/wp.png")
@@ -145,6 +158,10 @@ desktop = PixelSceneBuilder.new("desktop")
         z_index = 0,
         x = 202,
         y = 173,
+        canInteract = function(self)
+            local win = self.scene and self.scene:getElement("facebook_window")
+            return not (win and win.visible)
+        end,
         onInteract = function(self)
             self.scene:getElement("facebook_window").visible = true
             GameState.set("level2_facebook", true)
@@ -219,10 +236,17 @@ desktop = PixelSceneBuilder.new("desktop")
         x = 167,
         y = 57,
         canInteract = function(self)
-            return not GameState.get("level2_wardrobe_moved")
+            if GameState.get("level2_wardrobe_moved") then
+                return false
+            end
+            if self.is_open and not isImpoNoteOpened(self.scene) then
+                return false
+            end
+            return true
         end,
         onInteract = function(self)
-            if not GameState.get("level2_folder_collected") then
+            if not isImpoNoteOpened(self.scene) then
+                self.is_open = true
                 self.image = "assets/level2/wardrobe_open.png"
                 if not self.open_img then
                     local ok, img = pcall(love.graphics.newImage, self.image)
@@ -238,6 +262,20 @@ desktop = PixelSceneBuilder.new("desktop")
                 end
             else
                 GameState.set("level2_wardrobe_moved", true)
+                self.is_open = true
+                self.image = "assets/level2/wardrobe_open.png"
+                if not self.open_img then
+                    local ok, img = pcall(love.graphics.newImage, self.image)
+                    if ok and img then
+                        img:setFilter("nearest", "nearest")
+                        self.open_img = img
+                    end
+                end
+                if self.open_img then
+                    self.img_obj = self.open_img
+                    self.w = self.open_img:getWidth()
+                    self.h = self.open_img:getHeight()
+                end
                 self.x = self.x - 24
                 self.scene:getElement("card").visible = true
                 self.scene:getElement("doc").visible = true
@@ -251,8 +289,12 @@ desktop = PixelSceneBuilder.new("desktop")
         x = 100,
         y = 4,
         flipped = false,
+        canInteract = function(self)
+            return not self.flipped
+        end,
         onInteract = function(self)
             self.flipped = true
+            GameState.set("level2_pic1_flipped", true)
         end,
         draw = function(self)
             if not self.my_img then
@@ -280,8 +322,13 @@ desktop = PixelSceneBuilder.new("desktop")
         z_index = 0,
         x = 300,
         y = 9,
+        flipped = false,
+        canInteract = function(self)
+            return not self.flipped
+        end,
         onInteract = function(self)
             self.flipped = true
+            GameState.set("level2_pic2_flipped", true)
         end,
         draw = function(self)
             if not self.my_img then
@@ -309,8 +356,13 @@ desktop = PixelSceneBuilder.new("desktop")
         z_index = 0,
         x = 319,
         y = 134,
+        flipped = false,
+        canInteract = function(self)
+            return not self.flipped
+        end,
         onInteract = function(self)
             self.flipped = true
+            GameState.set("level2_pic3_flipped", true)
         end,
         draw = function(self)
             if not self.my_img then
@@ -340,10 +392,14 @@ desktop = PixelSceneBuilder.new("desktop")
         z_index = 0,
         x = 406,
         y = 140,
+        opened = false,
         canInteract = function(self)
-            return not self.timer
+            return not self.opened and not self.timer
         end,
         onInteract = function(self)
+            if self.opened then return end
+            self.opened = true
+            GameState.set("level2_closet_opened", true)
             AudioManager.musFadeTo(nil, 0, 0)
             self.timer = 2.0
 
@@ -397,7 +453,7 @@ desktop = PixelSceneBuilder.new("desktop")
         x = 409,
         y = 53,
         canInteract = function(self)
-            return GameState.get("level2_facebook") and not GameState.get("level2_sofa_moved")
+            return (GameState.get("level2_facebook_vandalized") or GameState.get("level2_facebook")) and not GameState.get("level2_sofa_moved")
         end,
         onInteract = function(self)
             GameState.set("level2_sofa_moved", true)
@@ -478,10 +534,12 @@ desktop = PixelSceneBuilder.new("desktop")
             self.scene:toggleElement("card_window")
             local win = self.scene:getElement("card_window")
             self.scene:setElementActive("card_note", win and win.visible)
+            if win and win.visible then
+                GameState.set("level2_impo_note_opened", true)
+            end
         end,
         onInteract = function(self)
             self:onClick()
-            self.scene:getElement("wardrobe").interactable = true
         end
     })
     :addWindow("card_window", {
@@ -545,7 +603,7 @@ i mean it's not that seriouss!]],
             return GameState.get("level2_card_collected")
         end,
         onInteract = function(self)
-            SceneManager.crossFade("level3", 0.4)
+            SceneManager.crossFade("level2-2", 0.4)
         end
     })
 
@@ -623,10 +681,35 @@ local Level1Scene = GameScene.new({
     enter = function(self)
         AudioManager.musFadeTo("mr_boss", 0.8, 0.5)
         tip_timer = 6.0
+        GameState.set("level2_impo_note_opened", false)
         local icon = desktop and desktop:getElement("tray_exclamation")
         if icon then icon.visible = true end
         local tip = desktop and desktop:getElement("tooltip_exclamation")
         if tip then tip.visible = true end
+
+        local closet = desktop and desktop:getElement("closet")
+        if closet then
+            closet.opened = GameState.get("level2_closet_opened", false)
+            closet.timer = nil
+            if closet.closed_img then
+                closet.img_obj = closet.closed_img
+                closet.image = "assets/level2/big_wd.png"
+                closet.w = closet.closed_img:getWidth()
+                closet.h = closet.closed_img:getHeight()
+            end
+        end
+
+        local w = desktop and desktop:getElement("wardrobe")
+        if w then
+            w.is_open = false
+        end
+
+        for _, pid in ipairs({ "pic1", "pic2", "pic3" }) do
+            local p = desktop and desktop:getElement(pid)
+            if p then
+                p.flipped = GameState.get("level2_" .. pid .. "_flipped", false)
+            end
+        end
     end,
     leave = function(self)
         AudioManager.musStop(0.5)

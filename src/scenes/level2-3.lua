@@ -257,15 +257,15 @@ local desktop = PixelSceneBuilder.new("desktop_level2_3")
         outline_width = 5,
         z_index = -1,
         canInteract = function(self)
-            return not GameState.get("level2-3_coin_collected")
+            return not GameState.get("level2_3_coin_collected")
         end,
         onInteract = function(self)
-            if not GameState.get("level2-3_coin_collected") then
-                GameState.set("level2-3_coin_collected", true)
+            if not GameState.get("level2_3_coin_collected") then
+                GameState.set("level2_3_coin_collected", true)
                 self.visible = false
                 if AudioManager and AudioManager.sfxPlay then
                     pcall(AudioManager.sfxPlay, "coin")
-    end
+                end
             end
         end
     })

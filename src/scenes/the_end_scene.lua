@@ -105,65 +105,53 @@ local credits_content = {
 }
 
 function credits_content:initConditions()
-    local crowbar = GameState.get("level1_crowbar_collected", false)
-    local note = GameState.get("level1_note_collected", false)
-    local door_hacked = GameState.get("level1_2_door_opened", false)
     local correct = GameState.get("correct_bookshelves_exploded", 0)
     local wrong = GameState.get("wrong_bookshelves_exploded", 0)
     local eye_killed = GameState.get("eye_killed", false)
     local total_shelves = correct + wrong
 
     -- Good Ending: Killed the eye OR destroyed all 13 bookshelves
-    -- Bad Ending: Exploded at least 1 correct bookshelf and not all bookshelves
     self.is_good_end = eye_killed or (total_shelves >= 13)
 
-    local archive_title
-    local archive_desc
-    if wrong == 0 then
-        if correct >= 3 then
-            archive_title = "SURGICAL STRIKE"
-            archive_desc = "You destroyed all 3 designated bomb racks with zero collateral damage."
-        elseif correct > 0 then
-            archive_title = "PARTIAL SABOTAGE"
-            archive_desc = string.format("You destroyed %d of 3 designated bomb racks with zero collateral damage.", correct)
-        else
-            archive_title = "UNTOUCHED ARCHIVE"
-            archive_desc = "You slipped past without destroying any designated bomb racks."
-        end
-    else
-        archive_title = "COLLATERAL DAMAGE"
-        if correct >= 3 then
-            archive_desc = string.format("Destroyed all 3 designated bomb racks, but blew up %d wrong bookshelves.", wrong)
-        elseif correct > 0 then
-            archive_desc = string.format("Destroyed %d designated bomb racks and blew up %d wrong bookshelves.", correct, wrong)
-        else
-            archive_desc = string.format("Blew up %d wrong bookshelves without hitting designated racks.", wrong)
-        end
-    end
+    local p1 = GameState.get("level2_pic1_flipped", false)
+    local p2 = GameState.get("level2_pic2_flipped", false)
+    local p3 = GameState.get("level2_pic3_flipped", false)
+    local all_pics_flipped = p1 and p2 and p3
+
+    local closet_opened = GameState.get("level2_closet_opened", false)
+    local facebook_vandalized = GameState.get("level2_facebook_vandalized", false)
+    local coin_collected = GameState.get("level2_3_coin_collected", false)
 
     self.items = {
         {
-            title = crowbar and "THE CROWBAR" or "UNTOUCHED VENT",
-            desc = crowbar and "You scavenged the rusted crowbar and broke through the vent shaft."
-                           or "You slipped past without ever touching the crowbar or the vent.",
-            image = crowbar and "assets/level1/fomka.png" or "assets/level1/vent_c.png"
+            title = all_pics_flipped and "GALLERY INVERTED" or "GALLERY UNTOUCHED",
+            desc = all_pics_flipped and "You turned every single painting upside down in the director's office."
+                                    or "You left the director's paintings hanging straight on the walls.",
+            image = "assets/level2/pic_1.png",
+            flipped_y = all_pics_flipped
         },
         {
-            title = note and "ENCRYPTED MEMO" or "SEALED CHEST",
-            desc = note and "You opened the locked chest and retrieved the hacker's secret note."
-                        or "The forgotten chest and its hidden message remained sealed.",
-            image = note and "assets/level1/note.png" or "assets/level1/chest_closed.png"
+            title = closet_opened and "WARDROBE SECRET" or "SEALED WARDROBE",
+            desc = closet_opened and "You opened the tall wardrobe and uncovered the horrifying secret inside."
+                                 or "You walked past the tall wardrobe without ever discovering its dark secret.",
+            image = closet_opened and "assets/level2/big_wd_o.png" or "assets/level2/big_wd.png"
         },
         {
-            title = door_hacked and "ROOT OVERRIDE" or "FIREWALL BYPASS",
-            desc = door_hacked and "Executed exploit CVE-8921 to override the magnetic gateway."
-                                or "Infiltrated through the secondary security corridor.",
-            image = door_hacked and "assets/level1/sublv2/terminal_enter.png" or "assets/level1/sublv2/terminal_bg.png"
+            title = facebook_vandalized and "YOURSPACE SLANDER" or "CIVIL BROWSING",
+            desc = facebook_vandalized and "You hijacked the terminal and posted a nasty comment on yourSpace."
+                                       or "You refrained from posting toxic insults on the director's profile.",
+            image = "assets/level2/facebook.png"
         },
         {
-            title = eye_killed and "ANTIVIRUS PURGED" or "GHOST PROTOCOL",
-            desc = eye_killed and "You permanently eliminated the Eye Antivirus."
-                              or "You respected the warnings and slipped past the Eye undetected.",
+            title = coin_collected and "COIN COLLECTED" or "COIN IGNORED",
+            desc = coin_collected and "You picked up the coin-looking thing in the transmission section."
+                                  or "You left the coin-looking thing in the transmission section.",
+            image = "assets/coin_credits.png"
+        },
+        {
+            title = eye_killed and "ADMINISTRATOR PURGED" or "ADMINISTRATOR SPARED",
+            desc = eye_killed and "You detonated high explosives and permanently eliminated the Administrator Eye."
+                              or "You followed instructions carefully and left the Administrator Eye unharmed.",
             image = "assets/level3/eye.png",
             is_eye = true
         }
@@ -288,11 +276,16 @@ function credits_content:drawConditionItem(item, y)
             elseif sw > max_w or sh > max_h then
                 scale = math.min(max_w / sw, max_h / sh)
             end
-            local dw, dh = sw * scale, sh * scale
+            local dw = math.floor(sw * scale)
+            local dh = math.floor(sh * scale)
             local dx = math.floor(img_cx - dw / 2)
             local dy = math.floor(img_cy - dh / 2)
             love.graphics.setColor(1, 1, 1, 1)
-            love.graphics.draw(img, dx, dy, 0, scale, scale)
+            if item.flipped_y then
+                love.graphics.draw(img, dx, dy + dh, 0, scale, -scale)
+            else
+                love.graphics.draw(img, dx, dy, 0, scale, scale)
+            end
         end
     end
 
