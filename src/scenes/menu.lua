@@ -60,7 +60,7 @@ local menu_content = {
     mouse_gy = 0,
     mouse_inside = false,
 
-    power_state = "off",     -- "off" | "powering_on" | "on"
+    power_state = "off", -- "off" | "powering_on" | "on"
     power_timer = 0,
     power_duration = 0.32
 }
@@ -337,7 +337,6 @@ local MenuScene = GameScene.new({
             local tw = f:getWidth(txt) * scale
             local th = f:getHeight() * scale
             love.graphics.print(txt, s.x + math.floor((s.w - tw) / 2), s.y + math.floor((s.h - th) / 2), 0, scale, scale)
-
         elseif menu_content.power_state == "powering_on" then
             local t = menu_content.power_timer
             local dur = menu_content.power_duration
@@ -366,7 +365,6 @@ local MenuScene = GameScene.new({
                 -- Central bright spark
                 local spot_r = 5 * (1 - p) + 1
                 love.graphics.circle("fill", cx, cy, spot_r)
-
             else
                 -- Phase 2: Vertical expansion of the CRT screen
                 local p = (t - t_beam) / (dur - t_beam)
@@ -419,4 +417,3 @@ local MenuScene = GameScene.new({
 })
 
 return MenuScene
-

@@ -136,8 +136,7 @@ local function getExclamationImg()
 end
 
 local function checkDoorUnlock()
-    local correct = GameState.get("correct_bookshelves_exploded", 0)
-    if correct >= TOTAL_BOMBS then
+    if eye and (eye.is_dead or GameState.get("eye_killed", false)) then
         local d_exit = desktop and desktop:getElement("door_exit")
         if d_exit then
             d_exit.visible = true
@@ -147,6 +146,7 @@ local function checkDoorUnlock()
         GameState.set("level3_cleared", true)
     end
 end
+
 
 local function triggerFirstExplosion(is_loud)
     if not first_explosion_done then
@@ -210,6 +210,7 @@ local function detonateEye()
     if AudioManager and AudioManager.sfxPlay then
         pcall(AudioManager.sfxPlay, "explosion")
     end
+    checkDoorUnlock()
 end
 
 desktop = PixelSceneBuilder.new("desktop_level3")
