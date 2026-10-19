@@ -157,7 +157,7 @@ local Level1Scene = GameScene.new({
         Effects.drawAsciiCrt(s.canvas, s.x, s.y, s.scale_x, s.scale_y)
     end,
     enter = function(self)
-        AudioManager.musFadeTo("cat", 0.2, 0.5, "reverb")
+        AudioManager.musFadeTo("web_havoc", 0.8, 0.2, "reverb")
     end,
     leave = function(self)
         AudioManager.musStop(0.5)

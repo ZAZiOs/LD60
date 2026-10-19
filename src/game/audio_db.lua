@@ -28,7 +28,7 @@ return {
             }
         },
         ["mr_boss"] = {
-            preloop = "assets/mus/mr_boss_intro.ogg",
+            preloop = "assets/mus/mr_boss_preloop.ogg",
             loop = "assets/mus/mr_boss_loop.ogg",
             volume = 0.8
         },

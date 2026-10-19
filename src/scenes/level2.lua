@@ -134,7 +134,7 @@ local desktop = PixelSceneBuilder.new("desktop")
                 self.interactable = false
             else
                 GameState.set("level2_wardrobe_moved", true)
-                self.x -= 24
+                self.x = self.x - 24
                 self.scene:getElement("card").visible = true
             end
         end
@@ -270,7 +270,7 @@ local desktop = PixelSceneBuilder.new("desktop")
         end,
         onInteract = function(self)
             GameState.set("level2_sofa_moved", true)
-            self.x -= 42
+            self.x = self.x - 42
             self.scene:getElement("folder").visible = true
         end
     })
