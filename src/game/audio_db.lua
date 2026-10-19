@@ -37,6 +37,10 @@ return {
             loop = "assets/mus/data_calm_loop.ogg",
             volume = 0.8,
         },
+        ["data_fail"] = {
+            preloop = "assets/mus/data_fail.ogg",
+            volume = 0.8,
+        },
         ["data_run"] = {
             loop = "assets/mus/data_run_loop.ogg",
             volume = 0.8,
@@ -60,6 +64,12 @@ return {
     sfx = {
         ["shutdown"] = {
             path = "assets/sfx/shutdown.ogg",
+            volume = 0.8,
+            pitch = 1.0,
+            pitch_variance = 0,
+        },
+        ["turnon"] = {
+            path = "assets/sfx/turnon_sfx.ogg",
             volume = 0.8,
             pitch = 1.0,
             pitch_variance = 0,
