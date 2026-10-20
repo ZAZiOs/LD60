@@ -743,7 +743,7 @@ function EditorScene:_initWindows()
 
                 win:button(label, iw, 24, function()
                     self:selectElement(i)
-                end)
+                end, is_sel)
             end
         end
     })
@@ -805,7 +805,7 @@ function EditorScene:drawBrowser()
     love.graphics.print("Browse folders, select a level to open, or create a new level", 40, 42)
 
     -- Header Right Buttons
-    local function topBtn(x, y, w, h, text, bg_col, hover_col, onClick)
+    local function topBtn(x, y, w, h, text, bg_col, hover_col)
         local hover = (mx >= x and mx <= x + w and my >= y and my <= y + h)
         love.graphics.setColor(hover and hover_col or bg_col)
         love.graphics.rectangle("fill", x, y, w, h, 4, 4)
@@ -815,25 +815,12 @@ function EditorScene:drawBrowser()
         if self.font_header then love.graphics.setFont(self.font_header) end
         local tw = self.font_header and self.font_header:getWidth(text) or 60
         love.graphics.print(text, x + (w - tw) / 2, y + (h - 18) / 2)
-
-        if hover and love.mouse.isDown(1) and not self.browser_btn_down then
-            self.browser_btn_down = true
-            onClick()
-        end
     end
 
-    topBtn(1680, 16, 200, 38, "+ Создать уровень", { 0.2, 0.52, 0.32, 1 }, { 0.28, 0.65, 0.4, 1 }, function()
-        self.show_new_level_dialog = true
-    end)
+    topBtn(1680, 16, 200, 38, "+ Создать уровень", { 0.2, 0.52, 0.32, 1 }, { 0.28, 0.65, 0.4, 1 })
 
     if self.level_data then
-        topBtn(1440, 16, 220, 38, "В редактор (Esc)", { 0.2, 0.26, 0.38, 1 }, { 0.3, 0.38, 0.55, 1 }, function()
-            self.view_mode = "workspace"
-        end)
-    end
-
-    if not love.mouse.isDown(1) then
-        self.browser_btn_down = false
+        topBtn(1440, 16, 220, 38, "В редактор (Esc)", { 0.2, 0.26, 0.38, 1 }, { 0.3, 0.38, 0.55, 1 })
     end
 
     -- Breadcrumb Bar
@@ -1052,35 +1039,42 @@ function EditorScene:drawNewLevelDialog()
     love.graphics.setColor(hover_chk and { 1, 1, 1, 1 } or { 0.85, 0.88, 0.92, 1 })
     love.graphics.print("Fullscreen (без фона комнаты / ретро-монитора)", dx + 52, fy)
 
-    if hover_chk and love.mouse.isDown(1) and not self.dialog_chk_down then
-        self.dialog_chk_down = true
-        self.new_level_fullscreen = not self.new_level_fullscreen
-    end
-    if not love.mouse.isDown(1) then self.dialog_chk_down = false end
-
     -- Buttons
-    local function dlgBtn(bx, by, bw, bh, text, col, hover_c, onClick)
+    local function dlgBtn(bx, by, bw, bh, text, col, hover_c)
         local hover = (mx >= bx and mx <= bx + bw and my >= by and my <= by + bh)
         love.graphics.setColor(hover and hover_c or col)
         love.graphics.rectangle("fill", bx, by, bw, bh, 4, 4)
         love.graphics.setColor(1, 1, 1, 1)
         local tw = self.font_header and self.font_header:getWidth(text) or 60
         love.graphics.print(text, bx + (bw - tw) / 2, by + (bh - 18) / 2)
-        if hover and love.mouse.isDown(1) and not self.dialog_btn_down then
-            self.dialog_btn_down = true
-            onClick()
-        end
     end
 
-    dlgBtn(dx + 24, dy + dh - 56, 240, 40, "Создать и открыть", { 0.2, 0.55, 0.35, 1 }, { 0.28, 0.68, 0.45, 1 }, function()
-        self:createAndOpenNewLevel()
-    end)
+    dlgBtn(dx + 24, dy + dh - 56, 240, 40, "Создать и открыть", { 0.2, 0.55, 0.35, 1 }, { 0.28, 0.68, 0.45, 1 })
+    dlgBtn(dx + dw - 150, dy + dh - 56, 126, 40, "Отмена", { 0.25, 0.28, 0.35, 1 }, { 0.35, 0.38, 0.48, 1 })
+end
 
-    dlgBtn(dx + dw - 150, dy + dh - 56, 126, 40, "Отмена", { 0.25, 0.28, 0.35, 1 }, { 0.35, 0.38, 0.48, 1 }, function()
-        self.show_new_level_dialog = false
-    end)
+function EditorScene:handleNewLevelDialogClick(vx, vy)
+    local dw = 620
+    local dh = 360
+    local dx = (1920 - dw) / 2
+    local dy = (1080 - dh) / 2
 
-    if not love.mouse.isDown(1) then self.dialog_btn_down = false end
+    local fy = dy + 214
+    if vx >= dx + 24 and vx <= dx + 300 and vy >= fy and vy <= fy + 24 then
+        self.new_level_fullscreen = not self.new_level_fullscreen
+        return true
+    end
+
+    if vy >= dy + dh - 56 and vy <= dy + dh - 16 then
+        if vx >= dx + 24 and vx <= dx + 24 + 240 then
+            self:createAndOpenNewLevel()
+            return true
+        elseif vx >= dx + dw - 150 and vx <= dx + dw - 24 then
+            self.show_new_level_dialog = false
+            return true
+        end
+    end
+    return false
 end
 
 -- ==============================================================================
@@ -1269,31 +1263,38 @@ function EditorScene:drawCanvas()
             end
         end
 
-        -- 3. Visual Selection Highlight (Yellow boundary on the object)
-        if is_sel then
-            love.graphics.setColor(1, 0.85, 0.2, 1)
-            love.graphics.setLineWidth(2)
-            love.graphics.rectangle("line", ex - 2, ey - 2, ew + 4, eh + 4)
+    end
 
-            -- Corner resize/drag handles
-            love.graphics.rectangle("fill", ex - 4, ey - 4, 6, 6)
-            love.graphics.rectangle("fill", ex + ew - 2, ey - 4, 6, 6)
-            love.graphics.rectangle("fill", ex - 4, ey + eh - 2, 6, 6)
-            love.graphics.rectangle("fill", ex + ew - 2, ey + eh - 2, 6, 6)
+    -- 3. Visual Selection Highlight for active element (Rendered on top of ALL elements!)
+    if self.selected_element and self.selected_index then
+        local el = self.selected_element
+        local vw, vh = self:resolveVisual(el)
+        local ex, ey = self:worldToScreen(el.x or 0, el.y or 0)
+        local ew = vw * self.zoom
+        local eh = vh * self.zoom
 
-            -- Selection Tag above object
-            local tag_str = tostring(el.id) .. " (" .. tostring(vw) .. "x" .. tostring(vh) .. ")"
-            if el.collisions and #el.collisions > 0 then
-                tag_str = tag_str .. string.format(" [Custom Collision: %d]", #el.collisions)
-            end
-            love.graphics.setColor(0.1, 0.12, 0.16, 0.85)
-            local tw = self.font_small and self.font_small:getWidth(tag_str) or 80
-            love.graphics.rectangle("fill", ex, ey - 18, tw + 8, 16, 2, 2)
-            love.graphics.setColor(1, 0.88, 0.3, 1)
-            if self.font_small then
-                love.graphics.setFont(self.font_small)
-                love.graphics.print(tag_str, ex + 4, ey - 17)
-            end
+        love.graphics.setColor(1, 0.85, 0.2, 1)
+        love.graphics.setLineWidth(2)
+        love.graphics.rectangle("line", ex - 2, ey - 2, ew + 4, eh + 4)
+
+        -- Corner resize/drag handles
+        love.graphics.rectangle("fill", ex - 4, ey - 4, 6, 6)
+        love.graphics.rectangle("fill", ex + ew - 2, ey - 4, 6, 6)
+        love.graphics.rectangle("fill", ex - 4, ey + eh - 2, 6, 6)
+        love.graphics.rectangle("fill", ex + ew - 2, ey + eh - 2, 6, 6)
+
+        -- Selection Tag above object
+        local tag_str = tostring(el.id) .. " (" .. tostring(vw) .. "x" .. tostring(vh) .. ")"
+        if el.collisions and #el.collisions > 0 then
+            tag_str = tag_str .. string.format(" [Custom Collision: %d]", #el.collisions)
+        end
+        love.graphics.setColor(0.1, 0.12, 0.16, 0.9)
+        local tw = self.font_small and self.font_small:getWidth(tag_str) or 80
+        love.graphics.rectangle("fill", ex, ey - 18, tw + 8, 16, 2, 2)
+        love.graphics.setColor(1, 0.88, 0.3, 1)
+        if self.font_small then
+            love.graphics.setFont(self.font_small)
+            love.graphics.print(tag_str, ex + 4, ey - 17)
         end
     end
 
@@ -1313,6 +1314,88 @@ function EditorScene:drawCanvas()
     love.graphics.rectangle("line", sx, sy, sw, sh)
 end
 
+function EditorScene:getTopBarButtons()
+    local is_col_mode = (self.edit_mode == "collision")
+    local mode_label = is_col_mode and "Mode: Collision (C)" or "Mode: Object (V)"
+    local mode_cols = is_col_mode and { { 0.18, 0.45, 0.55, 1 }, { 0.25, 0.58, 0.7, 1 } } or { { 0.55, 0.4, 0.15, 1 }, { 0.7, 0.52, 0.2, 1 } }
+
+    return {
+        {
+            label = "Levels Browser",
+            w = 120,
+            onClick = function() self:initBrowser() self.view_mode = "browser" end
+        },
+        {
+            label = "Save (Ctrl+S)",
+            w = 100,
+            onClick = function() self:saveLevel() end
+        },
+        {
+            label = "Playtest (F5)",
+            w = 105,
+            active = false,
+            custom_col = { { 0.2, 0.45, 0.28, 1 }, { 0.28, 0.58, 0.36, 1 } },
+            onClick = function() self:startPlaytest() end
+        },
+        {
+            label = mode_label,
+            w = 150,
+            active = true,
+            custom_col = mode_cols,
+            onClick = function()
+                self.edit_mode = is_col_mode and "object" or "collision"
+                self:setStatus("Mode switched to: " .. self.edit_mode:upper())
+            end
+        },
+        {
+            label = self.show_collisions ~= false and "Collisions: ON" or "Collisions: OFF",
+            w = 115,
+            active = (self.show_collisions ~= false),
+            onClick = function() self.show_collisions = not self.show_collisions end
+        },
+        {
+            label = self.show_windows ~= false and "Windows: ON" or "Windows: OFF",
+            w = 105,
+            active = (self.show_windows ~= false),
+            onClick = function() self.show_windows = not self.show_windows end
+        },
+        {
+            label = "Tools",
+            w = 60,
+            onClick = function() WindowManager.get("win_tools"):toggle() end
+        },
+        {
+            label = "Inspector",
+            w = 78,
+            onClick = function() WindowManager.get("win_inspector"):toggle() end
+        },
+        {
+            label = "Settings",
+            w = 74,
+            onClick = function() WindowManager.get("win_settings"):toggle() end
+        },
+        {
+            label = "Hierarchy",
+            w = 78,
+            onClick = function() WindowManager.get("win_tree"):toggle() end
+        }
+    }
+end
+
+function EditorScene:handleTopBarClick(vx, vy)
+    if vy < 8 or vy > 34 then return false end
+    local btn_x = 360
+    local buttons = self:getTopBarButtons()
+    for _, b in ipairs(buttons) do
+        if vx >= btn_x and vx <= btn_x + b.w then
+            if b.onClick then b.onClick() end
+            return true
+        end
+        btn_x = btn_x + b.w + 8
+    end
+    return false
+end
+
 function EditorScene:drawTopBar()
     love.graphics.setColor(0.12, 0.14, 0.18, 0.98)
     love.graphics.rectangle("fill", 0, 0, 1920, 42)
@@ -1329,61 +1412,27 @@ function EditorScene:drawTopBar()
     love.graphics.print("File: " .. fname, 160, 14)
 
     -- Top Menu Buttons
+    local mx, my = Viewport.getMousePosition()
     local btn_x = 360
-    local function menuBtn(label, w, onClick, active, custom_col)
-        local mx, my = Viewport.getMousePosition()
-        local hover = (mx >= btn_x and mx <= btn_x + w and my >= 8 and my <= 34)
-        if custom_col then
-            love.graphics.setColor(hover and custom_col[2] or custom_col[1])
-        elseif active then
+    local buttons = self:getTopBarButtons()
+
+    for _, b in ipairs(buttons) do
+        local hover = (mx >= btn_x and mx <= btn_x + b.w and my >= 8 and my <= 34)
+        if b.custom_col then
+            love.graphics.setColor(hover and b.custom_col[2] or b.custom_col[1])
+        elseif b.active then
             love.graphics.setColor(hover and { 0.25, 0.55, 0.85, 1 } or { 0.2, 0.45, 0.75, 1 })
         else
             love.graphics.setColor(hover and { 0.25, 0.32, 0.42, 1 } or { 0.16, 0.19, 0.26, 1 })
         end
-        love.graphics.rectangle("fill", btn_x, 8, w, 26, 3, 3)
+        love.graphics.rectangle("fill", btn_x, 8, b.w, 26, 3, 3)
         love.graphics.setColor(0.38, 0.45, 0.58, 1)
-        love.graphics.rectangle("line", btn_x, 8, w, 26, 3, 3)
+        love.graphics.rectangle("line", btn_x, 8, b.w, 26, 3, 3)
         love.graphics.setColor(1, 1, 1, 1)
-        local tw = self.font_body and self.font_body:getWidth(label) or 40
-        love.graphics.print(label, btn_x + (w - tw) / 2, 13)
+        local tw = self.font_body and self.font_body:getWidth(b.label) or 40
+        love.graphics.print(b.label, btn_x + (b.w - tw) / 2, 13)
 
-        if hover and love.mouse.isDown(1) and not self.top_btn_down then
-            self.top_btn_down = true
-            onClick()
-        end
-        btn_x = btn_x + w + 8
-    end
-
-    menuBtn("Levels Browser", 120, function() self:initBrowser() self.view_mode = "browser" end)
-    menuBtn("Save (Ctrl+S)", 100, function() self:saveLevel() end)
-    menuBtn("Playtest (F5)", 105, function() self:startPlaytest() end, false, { { 0.2, 0.45, 0.28, 1 }, { 0.28, 0.58, 0.36, 1 } })
-
-    -- Mode toggle button
-    local is_col_mode = (self.edit_mode == "collision")
-    local mode_label = is_col_mode and "Mode: Collision (C)" or "Mode: Object (V)"
-    local mode_cols = is_col_mode and { { 0.18, 0.45, 0.55, 1 }, { 0.25, 0.58, 0.7, 1 } } or { { 0.55, 0.4, 0.15, 1 }, { 0.7, 0.52, 0.2, 1 } }
-    menuBtn(mode_label, 150, function()
-        self.edit_mode = is_col_mode and "object" or "collision"
-        self:setStatus("Mode switched to: " .. self.edit_mode:upper())
-    end, true, mode_cols)
-
-    -- View toggles
-    menuBtn(self.show_collisions ~= false and "Collisions: ON" or "Collisions: OFF", 115, function()
-        self.show_collisions = not self.show_collisions
-    end, self.show_collisions ~= false)
-
-    menuBtn(self.show_windows ~= false and "Windows: ON" or "Windows: OFF", 105, function()
-        self.show_windows = not self.show_windows
-    end, self.show_windows ~= false)
-
-    -- Window toggles
-    menuBtn("Tools", 60, function() WindowManager.get("win_tools"):toggle() end)
-    menuBtn("Inspector", 78, function() WindowManager.get("win_inspector"):toggle() end)
-    menuBtn("Settings", 74, function() WindowManager.get("win_settings"):toggle() end)
-    menuBtn("Hierarchy", 78, function() WindowManager.get("win_tree"):toggle() end)
-
-    if not love.mouse.isDown(1) then
-        self.top_btn_down = false
+        btn_x = btn_x + b.w + 8
     end
 end
 
@@ -1398,7 +1447,7 @@ function EditorScene:drawBottomBar()
 
     love.graphics.setColor(0.8, 0.85, 0.9, 1)
     if self.font_body then love.graphics.setFont(self.font_body) end
-    local info = string.format("Cursor: (%d, %d) | Zoom: %d%% | Grid: %dpx [%s] | Mode: [%s] (Keys: [V] Object, [C] Collision, [Del] Delete, [Space+LMB] Pan)",
+    local info = string.format("Cursor: (%d, %d) | Zoom: %d%% | Grid: %dpx [%s] | Mode: [%s] (Keys: [Arrows] Move, [Alt+Arrows] Resize, [Shift] Fast, [V] Obj, [C] Col, [Del] Del)",
         wx, wy, math.floor(self.zoom * 100), self.grid_size, self.grid_snap and "ON" or "OFF", self.edit_mode:upper())
     love.graphics.print(info, 24, 1054)
 
@@ -1420,10 +1469,23 @@ end
 -- ==============================================================================
 function EditorScene:mousepressed(vx, vy, button, istouch, presses)
     if self.show_new_level_dialog then
+        if button == 1 then
+            self:handleNewLevelDialogClick(vx, vy)
+        end
         return
     end
 
     if self.view_mode == "browser" then
+        if button == 1 and vy >= 16 and vy <= 54 then
+            if vx >= 1680 and vx <= 1880 then
+                self.show_new_level_dialog = true
+                return
+            elseif self.level_data and vx >= 1440 and vx <= 1660 then
+                self.view_mode = "workspace"
+                return
+            end
+        end
+
         -- Handle column selection clicks
         local col_y = 136
         local col_h = 880
@@ -1460,7 +1522,16 @@ function EditorScene:mousepressed(vx, vy, button, istouch, presses)
         return
     end
 
-    if vy < 42 or vy > 1046 then return end
+    -- Top bar click
+    if vy <= 42 then
+        if button == 1 then
+            self:handleTopBarClick(vx, vy)
+        end
+        return
+    end
+
+    -- Bottom bar
+    if vy > 1046 then return end
 
     if button == 3 or (button == 1 and love.keyboard.isDown("space")) then
         self.panning = true
@@ -1512,8 +1583,11 @@ function EditorScene:mousepressed(vx, vy, button, istouch, presses)
             end
         end
 
+        -- Find all elements under the cursor (ordered from top to bottom)
         local clicked_idx = nil
         local els = (self.level_data and self.level_data.elements) or {}
+        local hits = {}
+
         for i = #els, 1, -1 do
             local el = els[i]
             local is_win = (el.type == "window" or el.is_window or (el.template and el.template:match("window")))
@@ -1524,8 +1598,38 @@ function EditorScene:mousepressed(vx, vy, button, istouch, presses)
                 local ew = vw
                 local eh = vh
                 if wx >= ex and wx <= ex + ew and wy >= ey and wy <= ey + eh then
-                    clicked_idx = i
+                    table.insert(hits, i)
+                end
+            end
+        end
+
+        if #hits > 0 then
+            -- Check if current selected element is one of the hits
+            local current_hit_pos = nil
+            for pos, idx in ipairs(hits) do
+                if idx == self.selected_index then
+                    current_hit_pos = pos
                     break
+                end
+            end
+
+            if current_hit_pos then
+                -- Cycle to the next element behind it!
+                local next_pos = current_hit_pos + 1
+                if next_pos > #hits then
+                    next_pos = 1
+                end
+                clicked_idx = hits[next_pos]
+                if #hits > 1 then
+                    local target_el = els[clicked_idx]
+                    self:setStatus(string.format("Selected [%d/%d]: %s", next_pos, #hits, tostring(target_el and target_el.id or "")))
+                end
+            else
+                -- First click: pick the topmost element
+                clicked_idx = hits[1]
+                if #hits > 1 then
+                    local target_el = els[clicked_idx]
+                    self:setStatus(string.format("Selected [1/%d]: %s (click again to select behind)", #hits, tostring(target_el and target_el.id or "")))
                 end
             end
         end
@@ -1696,28 +1800,98 @@ function EditorScene:keypressed(key, scancode, isrepeat)
         return
     end
 
-    -- Nudge selected element or collision box with arrows
-    if self.selected_element then
-        local step = love.keyboard.isDown("lshift") and self.grid_size or 1
-        if self.edit_mode == "collision" and self.selected_element.collisions and #self.selected_element.collisions > 0 then
-            local b = self.selected_element.collisions[self.selected_collision_idx or 1]
-            if b then
-                if key == "left" then b.x = (b.x or 0) - step
-                elseif key == "right" then b.x = (b.x or 0) + step
-                elseif key == "up" then b.y = (b.y or 0) - step
-                elseif key == "down" then b.y = (b.y or 0) + step end
+    -- Nudge or resize selected element / collision box with arrows
+    if self.selected_element and (key == "left" or key == "right" or key == "up" or key == "down") then
+        local shift = love.keyboard.isDown("lshift") or love.keyboard.isDown("rshift")
+        local alt = love.keyboard.isDown("lalt") or love.keyboard.isDown("ralt")
+        local step = shift and self.grid_size or 1
+
+        if self.edit_mode == "collision" then
+            -- Auto-create custom collision if default exists and user wants to edit it
+            if not self.selected_element.collisions or #self.selected_element.collisions == 0 then
+                local boxes, is_custom = self:getCollisionBoxes(self.selected_element)
+                if boxes and #boxes > 0 then
+                    local cur_ow = (self.selected_element.type == "oneway" or self.selected_element.one_way == true)
+                    local vw, vh = self:resolveVisual(self.selected_element)
+                    self.selected_element.collisions = {
+                        { x = 0, y = 0, w = vw, h = cur_ow and math.min(vh, 6) or vh, one_way = cur_ow, is_one_way = cur_ow, top_only = cur_ow }
+                    }
+                    self.selected_collision_idx = 1
+                end
+            end
+
+            if self.selected_element.collisions and #self.selected_element.collisions > 0 then
+                local b_idx = self.selected_collision_idx or 1
+                local b = self.selected_element.collisions[b_idx]
+                if b then
+                    local vw, vh = self:resolveVisual(self.selected_element)
+                    b.w = b.w or vw
+                    b.h = b.h or vh
+                    b.x = b.x or 0
+                    b.y = b.y or 0
+
+                    if alt then
+                        -- Resize mode: expand / shrink
+                        if key == "left" then
+                            b.w = math.max(1, b.w - step)
+                        elseif key == "right" then
+                            b.w = b.w + step
+                        elseif key == "up" then
+                            b.h = math.max(1, b.h - step)
+                        elseif key == "down" then
+                            b.h = b.h + step
+                        end
+                        self:setStatus(string.format("Collision #%d Size: %dx%d (Offset: %d, %d)", b_idx, b.w, b.h, b.x, b.y))
+                    else
+                        -- Move mode
+                        if key == "left" then
+                            b.x = b.x - step
+                        elseif key == "right" then
+                            b.x = b.x + step
+                        elseif key == "up" then
+                            b.y = b.y - step
+                        elseif key == "down" then
+                            b.y = b.y + step
+                        end
+                        self:setStatus(string.format("Collision #%d Offset: (%d, %d) [Alt+Arrows to resize]", b_idx, b.x, b.y))
+                    end
+                end
             end
         else
-            if key == "left" then
-                self.selected_element.x = (self.selected_element.x or 0) - step
-            elseif key == "right" then
-                self.selected_element.x = (self.selected_element.x or 0) + step
-            elseif key == "up" then
-                self.selected_element.y = (self.selected_element.y or 0) - step
-            elseif key == "down" then
-                self.selected_element.y = (self.selected_element.y or 0) + step
+            -- Object mode
+            local el = self.selected_element
+            local vw, vh = self:resolveVisual(el)
+
+            if alt then
+                -- Resize object
+                el.w = el.w or vw
+                el.h = el.h or vh
+                el.custom_size = true
+                if key == "left" then
+                    el.w = math.max(1, el.w - step)
+                elseif key == "right" then
+                    el.w = el.w + step
+                elseif key == "up" then
+                    el.h = math.max(1, el.h - step)
+                elseif key == "down" then
+                    el.h = el.h + step
+                end
+                self:setStatus(string.format("%s Size: %dx%d (Pos: %d, %d)", tostring(el.id), el.w, el.h, el.x or 0, el.y or 0))
+            else
+                -- Move object
+                if key == "left" then
+                    el.x = (el.x or 0) - step
+                elseif key == "right" then
+                    el.x = (el.x or 0) + step
+                elseif key == "up" then
+                    el.y = (el.y or 0) - step
+                elseif key == "down" then
+                    el.y = (el.y or 0) + step
+                end
+                self:setStatus(string.format("%s Pos: (%d, %d) [Alt+Arrows to resize]", tostring(el.id), el.x or 0, el.y or 0))
             end
         end
+        return
     end
 end
 

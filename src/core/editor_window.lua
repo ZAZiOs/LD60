@@ -87,6 +87,10 @@ end
 
 function EditorWindow:endLayout()
     self.content_height = self.total_content_h + 20
+    self.clicked_now = nil
+    if not love.mouse or not love.mouse.isDown(1) then
+        self.active_stepper = nil
+    end
 end
 
 function EditorWindow:label(text, color, h)
@@ -111,7 +115,7 @@ function EditorWindow:separator(h)
     self.total_content_h = self.total_content_h + h
 end
 
-function EditorWindow:button(text, w, h, onClick)
+function EditorWindow:button(text, w, h, onClick, active, custom_col)
     w = w or self.layout_iw
     h = h or 26
 
@@ -119,13 +123,18 @@ function EditorWindow:button(text, w, h, onClick)
     local is_visible = (self.cur_y + h >= self.layout_iy and self.cur_y <= self.layout_iy + self.layout_ih)
 
     if is_visible then
-        if is_hover then
+        if custom_col then
+            love.graphics.setColor(is_hover and custom_col[2] or custom_col[1])
+        elseif active then
+            love.graphics.setColor(is_hover and { 0.28, 0.55, 0.85, 1 } or { 0.2, 0.42, 0.7, 1 })
+        elseif is_hover then
             love.graphics.setColor(0.25, 0.45, 0.8, 1)
         else
             love.graphics.setColor(0.18, 0.22, 0.3, 0.95)
         end
         love.graphics.rectangle("fill", self.cur_x, self.cur_y, w, h, 3, 3)
-        love.graphics.setColor(0.4, 0.48, 0.6, 1)
+        love.graphics.setLineWidth(1)
+        love.graphics.setColor(active and { 0.5, 0.75, 1, 1 } or { 0.4, 0.48, 0.6, 1 })
         love.graphics.rectangle("line", self.cur_x, self.cur_y, w, h, 3, 3)
 
         love.graphics.setColor(1, 1, 1, 1)
@@ -137,6 +146,7 @@ function EditorWindow:button(text, w, h, onClick)
 
     local clicked = false
     if is_hover and self.clicked_now then
+        self.clicked_now = nil
         clicked = true
         if onClick then onClick() end
     end
@@ -169,6 +179,7 @@ function EditorWindow:checkbox(label, checked, onToggle)
     end
 
     if is_hover and self.clicked_now then
+        self.clicked_now = nil
         checked = not checked
         if onToggle then onToggle(checked) end
     end
@@ -194,6 +205,9 @@ function EditorWindow:numberStepper(label, val, step, onValChange, min_val, max_
         local val_w = 80
         local start_x = self.cur_x + self.layout_iw - (btn_w * 2 + val_w + 4)
 
+        local step_id_minus = tostring(label) .. "_" .. tostring(self.cur_y) .. "_minus"
+        local step_id_plus = tostring(label) .. "_" .. tostring(self.cur_y) .. "_plus"
+
         -- Minus button
         local hover_minus = (self.mx >= start_x and self.mx <= start_x + btn_w and self.my >= self.cur_y and self.my <= self.cur_y + h)
         love.graphics.setColor(hover_minus and { 0.28, 0.35, 0.45, 1 } or { 0.18, 0.22, 0.3, 1 })
@@ -202,9 +216,20 @@ function EditorWindow:numberStepper(label, val, step, onValChange, min_val, max_
         love.graphics.print("-", start_x + 9, self.cur_y + 4)
 
         if hover_minus and self.clicked_now then
+            self.clicked_now = nil
             val = val - step
             if min_val and val < min_val then val = min_val end
             if onValChange then onValChange(val) end
+            self.active_stepper = { id = step_id_minus, timer = 0, delay = 0.35, interval = 0.06 }
+        elseif hover_minus and love.mouse and love.mouse.isDown(1) and self.active_stepper and self.active_stepper.id == step_id_minus then
+            local dt = love.timer and love.timer.getDelta() or 0.016
+            self.active_stepper.timer = self.active_stepper.timer + dt
+            if self.active_stepper.timer >= self.active_stepper.delay then
+                val = val - step
+                if min_val and val < min_val then val = min_val end
+                if onValChange then onValChange(val) end
+                self.active_stepper.delay = self.active_stepper.delay + self.active_stepper.interval
+            end
         end
 
         -- Value display box
@@ -227,9 +252,20 @@ function EditorWindow:numberStepper(label, val, step, onValChange, min_val, max_
         love.graphics.print("+", plus_x + 8, self.cur_y + 4)
 
         if hover_plus and self.clicked_now then
+            self.clicked_now = nil
             val = val + step
             if max_val and val > max_val then val = max_val end
             if onValChange then onValChange(val) end
+            self.active_stepper = { id = step_id_plus, timer = 0, delay = 0.35, interval = 0.06 }
+        elseif hover_plus and love.mouse and love.mouse.isDown(1) and self.active_stepper and self.active_stepper.id == step_id_plus then
+            local dt = love.timer and love.timer.getDelta() or 0.016
+            self.active_stepper.timer = self.active_stepper.timer + dt
+            if self.active_stepper.timer >= self.active_stepper.delay then
+                val = val + step
+                if max_val and val > max_val then val = max_val end
+                if onValChange then onValChange(val) end
+                self.active_stepper.delay = self.active_stepper.delay + self.active_stepper.interval
+            end
         end
     end
 
@@ -316,7 +352,9 @@ function EditorWindowManager.mousepressed(mx, my, button)
                     end
                 else
                     -- Inside window content
-                    w.clicked_now = true
+                    if button == 1 then
+                        w.clicked_now = true
+                    end
                     if w.on_mousepressed then
                         w:on_mousepressed(mx, my, button)
                     end
@@ -348,6 +386,7 @@ function EditorWindowManager.mousereleased(mx, my, button)
             consumed = true
         end
         w.clicked_now = nil
+        w.active_stepper = nil
     end
     return consumed
 end
@@ -395,6 +434,7 @@ function EditorWindowManager.draw()
             end
             love.graphics.setLineWidth(2)
             love.graphics.rectangle("line", w.x, w.y, w.w, win_h, 4, 4)
+            love.graphics.setLineWidth(1)
 
             -- Title Bar
             if is_active then
@@ -437,16 +477,25 @@ function EditorWindowManager.draw()
             if not w.collapsed and w.draw_content then
                 local ix = w.x + 12
                 local iy = w.y + w.title_h + 8
-                local iw = w.w - 24
                 local ih = w.h - w.title_h - 16
 
-                -- Scissor clip for scrolling content
-                local sx, sy = Viewport.toScreen(ix, iy)
-                local sw = iw * Viewport.scale
-                local sh = ih * Viewport.scale
+                local has_scroll = (w.content_height and w.content_height > ih)
+                local scroll_margin = has_scroll and 10 or 0
+                local iw = w.w - 24 - scroll_margin
+
+                -- Scissor clip: clip to full inner window bounds so widget borders and padding are never clipped!
+                local clip_x = w.x + 2
+                local clip_y = w.y + w.title_h + 1
+                local clip_w = w.w - 4
+                local clip_h = math.max(0, win_h - w.title_h - 3)
+
+                local sx, sy = Viewport.toScreen(clip_x, clip_y)
+                local sw = clip_w * Viewport.scale
+                local sh = clip_h * Viewport.scale
 
                 love.graphics.push("all")
-                love.graphics.setScissor(sx, sy, sw, sh)
+                love.graphics.setLineWidth(1)
+                love.graphics.setScissor(math.floor(sx), math.floor(sy), math.ceil(sw), math.ceil(sh))
 
                 w:beginLayout(ix, iy, iw, ih, mx, my)
                 w:draw_content(ix, iy, iw, ih, mx, my)
