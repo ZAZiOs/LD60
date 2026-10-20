@@ -4,6 +4,7 @@ local unpack_fn = unpack or table.unpack
 
 local SceneManager = {
     definitions = {},
+    order = {},
     scenes = {},
     current_scene = nil,
     current = nil,
@@ -27,8 +28,23 @@ end
 
 function SceneManager.register(name, scene)
     assert(type(name) == "string", "Scene name must be a string")
+    if not SceneManager.definitions[name] then
+        table.insert(SceneManager.order, name)
+    end
     SceneManager.definitions[name] = scene
     SceneManager.scenes[name] = nil
+end
+
+function SceneManager.getRegisteredScenes()
+    local list = {}
+    for _, name in ipairs(SceneManager.order) do
+        table.insert(list, name)
+    end
+    return list
+end
+
+function SceneManager.has(name)
+    return SceneManager.definitions[name] ~= nil
 end
 
 function SceneManager._resolveTarget(name)

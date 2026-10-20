@@ -5,8 +5,12 @@ local Settings = require("src.core.settings")
 local I18n = require("src.core.i18n")
 local Effects = require("src.core.effects")
 local GameState = require("src.core.game_state")
+local LevelLoader = require("src.core.level_loader")
+local LevelSelector = require("src.core.level_selector")
 
 DEBUG = false
+local START_SCENE = "menu"
+local target_arg = nil
 
 function love.load(args)
     love.window.setTitle("mr_havoc")
@@ -15,7 +19,14 @@ function love.load(args)
         for _, v in ipairs(args) do
             if v == "debug" then
                 DEBUG = true
-                break
+            elseif v == "test_loader" then
+                print("--- RUNNING LEVEL LOADER TEST ---")
+                local scene = LevelLoader.loadFromFile("levels/ld60/test_level.ini")
+                assert(scene and scene.desktop, "LevelLoader failed to build scene!")
+                print("TEST_LOADER_SUCCESS: Desktop built with " .. tostring(#scene.desktop.elements) .. " elements")
+                os.exit(0)
+            else
+                target_arg = v
             end
         end
     end
@@ -61,11 +72,17 @@ function love.load(args)
     SceneManager.register("the_end", "src.scenes.the_end_scene")
     SceneManager.register("gameover", "src.scenes.gameover")
 
-    if DEBUG then
-        SceneManager.register("test_camera", "src.scenes.test_camera")
+    LevelLoader.registerAll("levels")
+
+    if target_arg then
+        if SceneManager.definitions[target_arg] then
+            START_SCENE = target_arg
+        elseif SceneManager.definitions["ld60." .. target_arg] then
+            START_SCENE = "ld60." .. target_arg
+        end
     end
 
-    SceneManager.goTo("menu")
+    SceneManager.goTo(START_SCENE)
 end
 
 function love.update(dt)
@@ -77,6 +94,9 @@ end
 function love.draw()
     Viewport.attach()
     SceneManager.draw()
+    if DEBUG and LevelSelector.isOpen() then
+        LevelSelector.draw()
+    end
     Viewport.detach()
 end
 
@@ -86,6 +106,17 @@ function love.resize(w, h)
 end
 
 function love.keypressed(key, scancode, isrepeat)
+    if DEBUG and key == "f1" then
+        LevelSelector.toggle()
+        return
+    end
+
+    if DEBUG and LevelSelector.isOpen() then
+        if LevelSelector.keypressed(key) then
+            return
+        end
+    end
+
     if key == "f11" or (key == "return" and (love.keyboard.isDown("lalt") or love.keyboard.isDown("ralt"))) then
         local cur = Settings.get("fullscreen") or false
         Settings.set("fullscreen", not cur)
@@ -96,24 +127,10 @@ function love.keypressed(key, scancode, isrepeat)
         return
     end
 
-    -- DEBUG: Room switching with [ and ]
     if DEBUG then
         local current = SceneManager.getCurrentName()
-        -- Rooms for debug
-        local debug_rooms = { 
-            "menu", 
-            "level0", 
-            "level1", 
-            "level1-2", 
-            "level1-3", 
-            "level2", 
-            "level2-2",
-            "level2-3", 
-            "level3", 
-            "the_end" 
-        }
+        local debug_rooms = SceneManager.getRegisteredScenes()
         
-        -- Current index
         local current_index = 1
         for i, name in ipairs(debug_rooms) do
             if name == current then
@@ -150,6 +167,11 @@ end
 
 function love.mousepressed(x, y, button, istouch, presses)
     local vx, vy = Viewport.toVirtual(x, y)
+    if DEBUG and LevelSelector.isOpen() then
+        if LevelSelector.mousepressed(vx, vy, button) then
+            return
+        end
+    end
     SceneManager.mousepressed(vx, vy, button, istouch, presses)
 end
 
@@ -166,6 +188,11 @@ function love.mousemoved(x, y, dx, dy, istouch)
 end
 
 function love.wheelmoved(x, y)
+    if DEBUG and LevelSelector.isOpen() then
+        if LevelSelector.wheelmoved(x, y) then
+            return
+        end
+    end
     SceneManager.wheelmoved(x, y)
 end
 
