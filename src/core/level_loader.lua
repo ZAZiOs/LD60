@@ -169,22 +169,36 @@ function LevelLoader.build(data, custom_logic)
         end
     end
 
-    local screen_cfg = parent.screen or {}
+    local is_fullscreen = (parent.fullscreen == true) or (parent.bg == nil and parent.screen == nil)
+    local screen_x, screen_y, screen_w, screen_h
+    if is_fullscreen then
+        screen_x, screen_y, screen_w, screen_h = 0, 0, 1920, 1080
+    else
+        local screen_cfg = parent.screen or {}
+        screen_x = screen_cfg.x or 320
+        screen_y = screen_cfg.y or 60
+        screen_w = screen_cfg.w or 1280
+        screen_h = screen_cfg.h or 960
+    end
+
+    local cam_w = room.camera_w or room.w or 320
+    local cam_h = room.camera_h or room.h or 240
+
     local screen = PixelScreen.new({
         game = desktop,
-        game_width = room.w or 320,
-        game_height = room.h or 240,
-        x = screen_cfg.x or 320,
-        y = screen_cfg.y or 60,
-        w = screen_cfg.w or 1280,
-        h = screen_cfg.h or 960
+        game_width = cam_w,
+        game_height = cam_h,
+        x = screen_x,
+        y = screen_y,
+        w = screen_w,
+        h = screen_h
     })
 
     local shader_name = (parent.shaders and parent.shaders[1]) or "crt"
     local draw_fn = LevelLoader.shaders[shader_name] or LevelLoader.shaders.crt
 
     local scene = GameScene.new({
-        bg = parent.bg or "assets/bg/intro_bg.png",
+        bg = parent.bg,
         screen = screen,
         screen_draw_fn = draw_fn,
         enter = function(self, ...)

@@ -40,13 +40,21 @@ end
 local function parse_boxes(val_str)
     local boxes = {}
     for box_str in val_str:gmatch("([^;]+)") do
-        local nums = parse_coords(box_str)
-        if #nums >= 4 then
+        local parts = parse_coords(box_str)
+        if #parts >= 4 then
+            local is_ow = false
+            if parts[5] ~= nil then
+                local p5 = tostring(parts[5]):lower()
+                is_ow = (p5 == "oneway" or p5 == "one_way" or p5 == "1" or p5 == "true")
+            end
             table.insert(boxes, {
-                x = nums[1],
-                y = nums[2],
-                w = nums[3],
-                h = nums[4]
+                x = tonumber(parts[1]) or 0,
+                y = tonumber(parts[2]) or 0,
+                w = tonumber(parts[3]) or 0,
+                h = tonumber(parts[4]) or 0,
+                one_way = is_ow,
+                is_one_way = is_ow,
+                top_only = is_ow
             })
         end
     end
@@ -94,8 +102,9 @@ function LevelParser.parse(input)
     local result = {
         meta = {},
         parent = {
-            bg = "assets/bg/intro_bg.png",
-            screen = { x = 320, y = 60, w = 1280, h = 960 },
+            bg = nil,
+            fullscreen = false,
+            screen = nil,
             shaders = { "crt" },
             music = nil
         },
@@ -103,6 +112,8 @@ function LevelParser.parse(input)
             id = "level",
             w = 320,
             h = 240,
+            camera_w = nil,
+            camera_h = nil,
             bg = nil,
             cursor = nil,
             spawn = nil,
@@ -200,10 +211,16 @@ function LevelParser.parse(input)
                             local c = parse_coords(val)
                             current_target.x = c[1] or 0
                             current_target.y = c[2] or 0
-                        elseif key == "size" then
+                        elseif key == "size" or key == "room_size" then
                             local c = parse_coords(val)
                             current_target.w = c[1] or 0
                             current_target.h = c[2] or 0
+                        elseif key == "camera_size" or key == "view_size" then
+                            local c = parse_coords(val)
+                            current_target.camera_w = c[1] or 0
+                            current_target.camera_h = c[2] or 0
+                        elseif key == "fullscreen" then
+                            current_target.fullscreen = (val == "true" or val == "yes" or val == "1" or val == true)
                         elseif key == "rect" or key == "screen" then
                             local c = parse_coords(val)
                             current_target.x = c[1] or 0

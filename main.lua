@@ -13,6 +13,7 @@ local START_SCENE = "menu"
 local target_arg = nil
 
 function love.load(args)
+    io.stdout:setvbuf("no")
     love.window.setTitle("mr_havoc")
 
     if args then
@@ -71,6 +72,7 @@ function love.load(args)
     SceneManager.register("level3", "src.scenes.level3")
     SceneManager.register("the_end", "src.scenes.the_end_scene")
     SceneManager.register("gameover", "src.scenes.gameover")
+    SceneManager.register("editor", "src.scenes.editor")
 
     LevelLoader.registerAll("levels")
 
@@ -108,6 +110,15 @@ end
 function love.keypressed(key, scancode, isrepeat)
     if DEBUG and key == "f1" then
         LevelSelector.toggle()
+        return
+    end
+
+    if DEBUG and key == "f2" then
+        if SceneManager.getCurrentName() == "editor" then
+            SceneManager.goTo(SceneManager.getPreviousName() or "menu")
+        else
+            SceneManager.goTo("editor")
+        end
         return
     end
 
