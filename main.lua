@@ -24,9 +24,27 @@ function love.load(args)
                 DEBUG = true
             elseif v == "test_loader" then
                 print("--- RUNNING LEVEL LOADER TEST ---")
-                local scene = LevelLoader.loadFromFile("levels/ld60/test_level.ini")
-                assert(scene and scene.desktop, "LevelLoader failed to build scene!")
-                print("TEST_LOADER_SUCCESS: Desktop built with " .. tostring(#scene.desktop.elements) .. " elements")
+                Effects.load()
+                local test_files = {
+                    "levels/ld60/test_level.ini",
+                    "levels/ld60/level0.ini",
+                    "levels/ld60/level1.ini",
+                    "levels/ld60/level1-2.ini",
+                    "levels/ld60/level1-3.ini",
+                    "levels/ld60/level2.ini",
+                    "levels/ld60/level2-2.ini",
+                    "levels/ld60/level2-3.ini",
+                    "levels/ld60/level3.ini"
+                }
+                for _, f in ipairs(test_files) do
+                    local sc = LevelLoader.loadFromFile(f)
+                    assert(sc and sc.desktop, "Failed to load " .. f)
+                    if sc.enter then sc:enter() end
+                    if sc.update then sc:update(0.016) end
+                    if sc.draw then sc:draw() end
+                    print("Loaded & rendered " .. f .. " with " .. tostring(#sc.desktop.elements) .. " elements")
+                end
+                print("--- ALL LEVEL LOADER TESTS PASSED ---")
                 os.exit(0)
             elseif v == "test_dash" then
                 print("--- RUNNING DASH TEST ---")
@@ -107,6 +125,102 @@ function love.load(args)
                 assert(p:dash() == true, "Player dash via Controls should work")
                 
                 print("--- CONTROLS TEST PASSED SUCCESSFULLY ---")
+                os.exit(0)
+            elseif v == "test_editor" then
+                print("--- RUNNING EDITOR TEST ---")
+                Viewport.init()
+                I18n.init()
+                Settings.init()
+                local EditorScene = require("src.scenes.editor")
+                EditorScene:enter()
+                
+                EditorScene:loadLevel("levels/ld60/level3.ini")
+                assert(EditorScene.level_data, "Level data must be loaded")
+                local eye_found = false
+                for _, el in ipairs(EditorScene.level_data.elements) do
+                    if el.id == "eye" then
+                        eye_found = true
+                        assert(el.type == "npc", "eye element should have type 'npc'")
+                        assert(el.sheet == "assets/level3/eye.ini", "eye should have sheet assets/level3/eye.ini")
+                        local vw, vh, img, iw, ih, sheet = EditorScene:resolveVisual(el)
+                        assert(sheet ~= nil, "eye visual should have resolved spritesheet")
+                        assert(sheet:getFrame("idle") ~= nil, "eye spritesheet should have idle frame")
+                        break
+                    end
+                end
+                assert(eye_found, "eye element should be found in level3 elements")
+                
+                -- 3. Add new object with texture
+                local new_el = EditorScene:addNewElement("element", {
+                    texture = "assets/level1/key.png",
+                    id = "custom_key_obj"
+                })
+                assert(new_el ~= nil, "Newly created element should not be nil")
+                assert(new_el.image == "assets/level1/key.png" or new_el.texture == "assets/level1/key.png", "Texture must be assigned to new element")
+                local vw2, vh2, img2 = EditorScene:resolveVisual(new_el)
+                assert(img2 ~= nil, "Visual image should be resolved for new element")
+                
+                -- 4. Test background change & repeat mode
+                EditorScene:setRoomBackground("assets/level1/cat_bg.png")
+                assert(EditorScene.level_data.room.bg == "assets/level1/cat_bg.png", "Room BG should be updated")
+                EditorScene:setBgRepeat("both")
+                assert(EditorScene.level_data.room.bg_repeat == "both", "Room bg_repeat should be set to 'both'")
+                
+                -- 5. Test serialization with new properties
+                local LevelSerializer = require("src.core.level_serializer")
+                local serialized = LevelSerializer.serialize(EditorScene.level_data)
+                assert(string.find(serialized, "bg_repeat%s*=%s*both"), "Serialized INI should contain bg_repeat = both")
+                assert(string.find(serialized, "%[npc:eye%]"), "Serialized INI should contain [npc:eye]")
+                assert(string.find(serialized, "%[element:custom_key_obj%]"), "Serialized INI should contain [element:custom_key_obj]")
+                assert(string.find(serialized, "image%s*=%s*assets/level1/key.png"), "Serialized INI should contain key texture")
+                
+                -- 6. Test Undo / Redo History
+                local count_before = #EditorScene.level_data.elements
+                assert(#EditorScene.undo_stack > 0, "Undo stack should have recorded actions")
+                
+                -- Undo background repeat change
+                assert(EditorScene.level_data.room.bg_repeat == "both", "Current bg_repeat should be 'both'")
+                assert(EditorScene:undo() == true, "Undo should succeed")
+                assert(EditorScene.level_data.room.bg_repeat ~= "both", "Undo should revert bg_repeat")
+                assert(#EditorScene.redo_stack == 1, "Redo stack should now have 1 item")
+                
+                -- Redo background repeat change
+                assert(EditorScene:redo() == true, "Redo should succeed")
+                assert(EditorScene.level_data.room.bg_repeat == "both", "Redo should restore bg_repeat to 'both'")
+                
+                -- Undo until new_el is gone
+                local found_new = false
+                for _, el in ipairs(EditorScene.level_data.elements) do
+                    if el.id == "custom_key_obj" then found_new = true break end
+                end
+                assert(found_new == true, "custom_key_obj should currently exist")
+                
+                -- Undo bg_repeat, undo room.bg, undo add element
+                EditorScene:undo() -- reverts bg_repeat
+                EditorScene:undo() -- reverts room.bg
+                EditorScene:undo() -- reverts addNewElement
+                found_new = false
+                for _, el in ipairs(EditorScene.level_data.elements) do
+                    if el.id == "custom_key_obj" then found_new = true break end
+                end
+                assert(found_new == false, "custom_key_obj should be undone and removed")
+                assert(#EditorScene.level_data.elements == count_before - 1, "Element count should decrease after undo")
+                
+                -- Redo add element
+                EditorScene:redo()
+                found_new = false
+                for _, el in ipairs(EditorScene.level_data.elements) do
+                    if el.id == "custom_key_obj" then found_new = true break end
+                end
+                assert(found_new == true, "custom_key_obj should return after redo")
+                
+                -- 7. Test rendering and update
+                EditorScene:update(0.016)
+                love.graphics.setCanvas(love.graphics.newCanvas(1920, 1080))
+                EditorScene:draw()
+                love.graphics.setCanvas()
+                
+                print("--- ALL EDITOR TESTS PASSED SUCCESSFULLY ---")
                 os.exit(0)
             else
                 target_arg = v

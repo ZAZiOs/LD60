@@ -66,6 +66,9 @@ function LevelSerializer.serialize(data)
     if r.bg and r.bg ~= "" then
         out("bg = " .. r.bg)
     end
+    if r.bg_repeat and r.bg_repeat ~= "" and r.bg_repeat ~= false then
+        out("bg_repeat = " .. tostring(r.bg_repeat))
+    end
     if r.cursor and r.cursor ~= "" then
         out("cursor = " .. r.cursor)
     end
@@ -110,7 +113,8 @@ function LevelSerializer.serialize(data)
         image = true, collisions = true, on_interact = true, script = true, z_index = true,
         max_delta_x = true, max_delta_y = true, speed = true, visible = true, is_solid = true,
         one_way = true, is_one_way = true, custom_size = true,
-        title = true, text = true, idle = true, active = true, target = true, fade = true
+        title = true, text = true, idle = true, active = true, target = true, fade = true,
+        sheet = true, frame = true
     }
 
     for _, el in ipairs(data.elements or {}) do
@@ -123,12 +127,19 @@ function LevelSerializer.serialize(data)
         if el.x ~= nil and el.y ~= nil then
             out(string.format("pos = %d, %d", el.x, el.y))
         end
-        local has_img = (el.image and el.image ~= "") or (el.idle and el.idle ~= "")
+        local has_img = (el.image and el.image ~= "") or (el.idle and el.idle ~= "") or (el.sheet and el.sheet ~= "")
         if (el.custom_size or not has_img) and el.w ~= nil and el.h ~= nil and el.w > 0 and el.h > 0 then
             out(string.format("size = %d, %d", el.w, el.h))
         end
-        if el.image and el.image ~= "" then
-            out("image = " .. el.image)
+        local img_path = (el.image and el.image ~= "" and el.image) or (el.texture and el.texture ~= "" and el.texture)
+        if img_path then
+            out("image = " .. img_path)
+        end
+        if el.sheet and el.sheet ~= "" then
+            out("sheet = " .. el.sheet)
+        end
+        if el.frame and el.frame ~= "" then
+            out("frame = " .. el.frame)
         end
         if el.idle and el.idle ~= "" then
             out("idle = " .. el.idle)

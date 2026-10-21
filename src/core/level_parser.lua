@@ -248,6 +248,13 @@ function LevelParser.parse(input)
                                 y = tonumber(parts[2]) or 0,
                                 sheet = parts[3] and tostring(parts[3]) or "assets/rage/rage_sh.ini"
                             }
+                        elseif key == "color" or key == "title_color" then
+                            local parts = parse_coords(val)
+                            local col = {}
+                            for _, p in ipairs(parts) do
+                                table.insert(col, tonumber(p) or 1)
+                            end
+                            current_target[key] = col
                         else
                             current_target[key] = parse_number_or_string(val)
                         end

@@ -4,6 +4,7 @@ local LevelParser = require("src.core.level_parser")
 local LevelLoader = require("src.core.level_loader")
 local LevelSerializer = require("src.core.level_serializer")
 local EditorUI = require("src.core.editor_window")
+local SpritesheetManager = require("src.core.spritesheet_manager")
 
 local EditorScene = {}
 EditorScene.__index = EditorScene
@@ -25,6 +26,17 @@ local function getImage(path)
     end
     image_cache[path] = false
     return nil
+end
+
+local function deepCopy(orig)
+    if type(orig) ~= "table" then
+        return orig
+    end
+    local copy = {}
+    for k, v in pairs(orig) do
+        copy[deepCopy(k)] = deepCopy(v)
+    end
+    return copy
 end
 
 local function listDirectoryItems(dir)
@@ -104,6 +116,17 @@ function EditorScene.new()
     self.status_text = "Level Editor Ready"
     self.status_timer = 3.0
 
+    -- History (Undo / Redo)
+    self.undo_stack = {}
+    self.redo_stack = {}
+    self.max_history = 60
+    self.drag_snapshot = nil
+    self.drag_snapshot_sel_id = nil
+    self.drag_action = nil
+    self.nudge_snapshot = nil
+    self.nudge_snapshot_sel_id = nil
+    self.nudge_timer = 0
+
     self.font_header = nil
     self.font_body = nil
     self.font_title = nil
@@ -136,6 +159,108 @@ end
 function EditorScene:setStatus(text)
     self.status_text = text
     self.status_timer = 4.0
+end
+
+function EditorScene:cloneLevelData()
+    if not self.level_data then return nil end
+    return deepCopy(self.level_data)
+end
+
+function EditorScene:flushNudge()
+    if self.nudge_snapshot then
+        table.insert(self.undo_stack, {
+            data = self.nudge_snapshot,
+            selected_id = self.nudge_snapshot_sel_id,
+            action = "Nudge / Resize"
+        })
+        if #self.undo_stack > (self.max_history or 60) then
+            table.remove(self.undo_stack, 1)
+        end
+        self.redo_stack = {}
+        self.nudge_snapshot = nil
+        self.nudge_snapshot_sel_id = nil
+        self.nudge_timer = 0
+    end
+end
+
+function EditorScene:pushHistory(action_name)
+    if not self.level_data then return end
+    self:flushNudge()
+
+    local state = {
+        data = deepCopy(self.level_data),
+        selected_id = self.selected_element and self.selected_element.id,
+        action = action_name or "Action"
+    }
+    table.insert(self.undo_stack, state)
+    if #self.undo_stack > (self.max_history or 60) then
+        table.remove(self.undo_stack, 1)
+    end
+    self.redo_stack = {}
+end
+
+function EditorScene:restoreState(state)
+    if not state or not state.data then return end
+    self.level_data = deepCopy(state.data)
+
+    local found_idx = nil
+    if state.selected_id and self.level_data.elements then
+        for i, el in ipairs(self.level_data.elements) do
+            if el.id == state.selected_id then
+                found_idx = i
+                break
+            end
+        end
+    end
+    self:selectElement(found_idx)
+end
+
+function EditorScene:undo()
+    self:flushNudge()
+    if not self.level_data or #self.undo_stack == 0 then
+        self:setStatus("Nothing to undo")
+        return false
+    end
+
+    local prev_state = table.remove(self.undo_stack)
+
+    local current_state = {
+        data = deepCopy(self.level_data),
+        selected_id = self.selected_element and self.selected_element.id,
+        action = prev_state.action or "Action"
+    }
+    table.insert(self.redo_stack, current_state)
+    if #self.redo_stack > (self.max_history or 60) then
+        table.remove(self.redo_stack, 1)
+    end
+
+    self:restoreState(prev_state)
+    self:setStatus("Undo: " .. tostring(prev_state.action or "Action"))
+    return true
+end
+
+function EditorScene:redo()
+    self:flushNudge()
+    if not self.level_data or #self.redo_stack == 0 then
+        self:setStatus("Nothing to redo")
+        return false
+    end
+
+    local next_state = table.remove(self.redo_stack)
+
+    local current_state = {
+        data = deepCopy(self.level_data),
+        selected_id = self.selected_element and self.selected_element.id,
+        action = next_state.action or "Action"
+    }
+    table.insert(self.undo_stack, current_state)
+    if #self.undo_stack > (self.max_history or 60) then
+        table.remove(self.undo_stack, 1)
+    end
+
+    self:restoreState(next_state)
+    self:setStatus("Redo: " .. tostring(next_state.action or "Action"))
+    return true
 end
 
 -- ==============================================================================
@@ -284,8 +409,31 @@ end
 -- WORKSPACE / LEVEL OPERATIONS
 -- ==============================================================================
 function EditorScene:resolveVisual(el)
-    if not el then return 16, 16, nil, 0, 0 end
-    local img_path = el.image or el.idle
+    if not el then return 16, 16, nil, 0, 0, nil end
+    local is_bookshelf = (el.type == "bookshelf" or (el.id and el.id:match("^s_f%d_%d")))
+    local is_npc = (el.type == "npc" or el.id == "eye" or (el.id and el.id:match("^npc_")))
+
+    -- Spritesheet NPC / Entity
+    local sheet_path = el.sheet
+    if not sheet_path and is_npc and not el.image then
+        sheet_path = "assets/level3/eye.ini"
+    end
+
+    if sheet_path then
+        local sheet = SpritesheetManager.getSheet(sheet_path)
+        if sheet then
+            local fw = sheet.frame_width or 32
+            local fh = sheet.frame_height or 32
+            local vw = el.w or fw
+            local vh = el.h or fh
+            return vw, vh, sheet.image, fw, fh, sheet
+        end
+    end
+
+    local img_path = el.image or el.idle or el.texture
+    if not img_path and is_bookshelf then
+        img_path = "assets/level3/bookshelf1.png"
+    end
     local img = getImage(img_path)
     local iw, ih = 0, 0
     if img then
@@ -296,13 +444,15 @@ function EditorScene:resolveVisual(el)
 
     -- If window, visual size is el.w, el.h
     if is_win then
-        return el.w or 192, el.h or 132, nil, 0, 0
+        return el.w or 192, el.h or 132, nil, 0, 0, nil
     end
 
     -- If image exists, natural size is iw, ih unless custom size is explicitly set
-    local vw = el.w or (img and iw) or (el.type == "taskbar" and 320) or 16
-    local vh = el.h or (img and ih) or (el.type == "taskbar" and 16) or 16
-    return vw, vh, img, iw, ih
+    local def_w = (el.type == "taskbar" and 320) or (is_bookshelf and 77) or (is_npc and 48) or 16
+    local def_h = (el.type == "taskbar" and 16) or (is_bookshelf and 97) or (is_npc and 48) or 16
+    local vw = el.w or (img and iw) or def_w
+    local vh = el.h or (img and ih) or def_h
+    return vw, vh, img, iw, ih, nil
 end
 
 function EditorScene:getCollisionBoxes(el)
@@ -329,6 +479,11 @@ function EditorScene:loadLevel(path)
         self.selected_index = nil
         self.selected_element = nil
         self.selected_collision_idx = 1
+        self.undo_stack = {}
+        self.redo_stack = {}
+        self.drag_snapshot = nil
+        self.nudge_snapshot = nil
+        self.nudge_timer = 0
 
         -- Sanitize elements that might have received spurious 16x16 size:
         for _, el in ipairs(self.level_data.elements or {}) do
@@ -395,6 +550,7 @@ end
 function EditorScene:deleteSelected()
     if self.selected_index and self.level_data then
         local id = self.selected_element and self.selected_element.id or ""
+        self:pushHistory("Delete " .. id)
         table.remove(self.level_data.elements, self.selected_index)
         self:selectElement(nil)
         self:setStatus("Deleted: " .. id)
@@ -403,6 +559,7 @@ end
 
 function EditorScene:duplicateSelected()
     if self.selected_element and self.level_data then
+        self:pushHistory("Duplicate " .. tostring(self.selected_element.id))
         local new_el = {}
         for k, v in pairs(self.selected_element) do
             if k == "collisions" and type(v) == "table" then
@@ -428,8 +585,15 @@ function EditorScene:duplicateSelected()
     end
 end
 
-function EditorScene:addNewElement(el_type, tpl_name)
-    if not self.level_data then return end
+function EditorScene:addNewElement(el_type, tpl_name, extra_props)
+    if not self.level_data then return nil end
+    self:pushHistory("Add " .. tostring(tpl_name or el_type or "object"))
+
+    if type(tpl_name) == "table" and not extra_props then
+        extra_props = tpl_name
+        tpl_name = nil
+    end
+
     local room = self.level_data.room or {}
     local spawn_x = math.floor((room.w or 320) / 2)
     local spawn_y = math.floor((room.h or 240) / 2)
@@ -474,6 +638,24 @@ function EditorScene:addNewElement(el_type, tpl_name)
         el.w = 32
         el.h = 48
         el.target = "level1"
+    elseif el_type == "bookshelf" then
+        el.image = "assets/level3/bookshelf1.png"
+        el.w = 77
+        el.h = 97
+        el.has_bomb = false
+    elseif el_type == "npc" then
+        el.type = "npc"
+        el.sheet = "assets/level3/eye.ini"
+        el.frame = "idle"
+        el.w = 48
+        el.h = 48
+        el.is_solid = false
+    elseif el_type == "element" or el_type == "sprite" then
+        el.type = "element"
+        el.image = "assets/level1/chest.png"
+        el.w = 32
+        el.h = 32
+        el.is_solid = false
     elseif el_type == "window" then
         el.title = "WINDOW"
         el.w = 192
@@ -481,9 +663,35 @@ function EditorScene:addNewElement(el_type, tpl_name)
         el.visible = false
     end
 
+    if extra_props then
+        if extra_props.texture and not extra_props.image then
+            extra_props.image = extra_props.texture
+        end
+        for k, v in pairs(extra_props) do
+            el[k] = v
+        end
+    end
+
     table.insert(self.level_data.elements, el)
     self:selectElement(#self.level_data.elements)
     self:setStatus("Created new: " .. new_id)
+    return el
+end
+
+function EditorScene:setRoomBackground(path)
+    if self.level_data and self.level_data.room then
+        self:pushHistory("Set Room BG")
+        self.level_data.room.bg = path
+        self:setStatus("Room BG set to: " .. tostring(path))
+    end
+end
+
+function EditorScene:setBgRepeat(mode)
+    if self.level_data and self.level_data.room then
+        self:pushHistory("Set BG Tiling")
+        self.level_data.room.bg_repeat = mode
+        self:setStatus("Room bg_repeat set to: " .. tostring(mode))
+    end
 end
 
 function EditorScene:_initWindows()
@@ -496,11 +704,18 @@ function EditorScene:_initWindows()
         w = 260,
         h = 480,
         draw_content = function(win, ix, iy, iw, ih, mx, my)
-            win:label("PRIMITIVES", { 0.4, 0.8, 1, 1 })
+            win:label("OBJECTS & NPCS", { 0.4, 0.8, 1, 1 })
             win:button("+ Solid Platform", iw, 26, function() self:addNewElement("solid") end)
             win:button("+ OneWay Platform", iw, 26, function() self:addNewElement("oneway") end)
+            win:button("+ Sprite / Object", iw, 26, function() self:addNewElement("element") end)
+            win:button("+ NPC (Eye / Character)", iw, 26, function() self:addNewElement("npc") end)
+            win:button("+ Bookshelf", iw, 26, function() self:addNewElement("bookshelf") end)
             win:button("+ Door Trigger", iw, 26, function() self:addNewElement("door") end)
             win:button("+ Window UI", iw, 26, function() self:addNewElement("window") end)
+            win:button("Open Assets Palette", iw, 26, function()
+                local wa = WindowManager.get("win_assets")
+                if wa then wa:open() WindowManager.bringToFront(wa) end
+            end, false, { { 0.22, 0.45, 0.65, 1 }, { 0.3, 0.58, 0.8, 1 } })
 
             win:separator(14)
             win:label("PREFABS / TEMPLATES", { 0.95, 0.8, 0.3, 1 })
@@ -559,12 +774,14 @@ function EditorScene:_initWindows()
                         el.w = win:numberStepper("Scale W", el.w or vw, self.grid_size, function(v) el.w = math.max(1, v) end, 1)
                         el.h = win:numberStepper("Scale H", el.h or vh, self.grid_size, function(v) el.h = math.max(1, v) end, 1)
                         win:button("Reset to 1:1 Sprite Size", iw, 24, function()
+                            self:pushHistory("Reset Sprite Size")
                             el.w = nil
                             el.h = nil
                             el.custom_size = nil
                         end)
                     else
                         win:button("Enable Custom Scale", iw, 22, function()
+                            self:pushHistory("Enable Custom Scale")
                             el.custom_size = true
                             el.w = el.w or iw_spr
                             el.h = el.h or ih_spr
@@ -587,16 +804,19 @@ function EditorScene:_initWindows()
 
                 -- Type switch buttons
                 win:button("Set: Solid Platform", iw, 24, function()
+                    self:pushHistory("Set Solid Platform")
                     el.is_solid = true
                     el.one_way = nil
                     if el.type == "oneway" then el.type = "solid" end
                 end)
                 win:button("Set: One-Way Platform", iw, 24, function()
+                    self:pushHistory("Set One-Way Platform")
                     el.is_solid = true
                     el.one_way = true
                     el.type = "oneway"
                 end)
                 win:button("Set: No Collision (Visual Only)", iw, 24, function()
+                    self:pushHistory("Remove Collision")
                     el.is_solid = false
                     el.one_way = false
                     el.collisions = nil
@@ -608,12 +828,14 @@ function EditorScene:_initWindows()
                     local has_custom = (el.collisions ~= nil and #el.collisions > 0)
                     local toggle_custom = win:checkbox("Collision != Object (Кастомные боксы)", has_custom)
                     if toggle_custom and not has_custom then
+                        self:pushHistory("Enable Custom Collision")
                         local def_h = (cur_ow and math.min(vh, 6) or vh)
                         el.collisions = {
                             { x = 0, y = 0, w = vw, h = def_h, one_way = cur_ow, is_one_way = cur_ow, top_only = cur_ow }
                         }
                         self.selected_collision_idx = 1
                     elseif not toggle_custom and has_custom then
+                        self:pushHistory("Disable Custom Collision")
                         el.collisions = nil
                         self.selected_collision_idx = 1
                     end
@@ -635,6 +857,7 @@ function EditorScene:_initWindows()
 
                             if #el.collisions > 1 then
                                 win:button("Удалить бокс #" .. b_idx, iw, 22, function()
+                                    self:pushHistory("Delete Collision Box")
                                     table.remove(el.collisions, b_idx)
                                     self.selected_collision_idx = 1
                                 end)
@@ -643,12 +866,14 @@ function EditorScene:_initWindows()
                         end
 
                         win:button("+ Добавить бокс коллизии", iw, 24, function()
+                            self:pushHistory("Add Collision Box")
                             table.insert(el.collisions, {
                                 x = 0, y = 0, w = vw, h = math.min(vh, 6), one_way = cur_ow, is_one_way = cur_ow, top_only = cur_ow
                             })
                             self.selected_collision_idx = #el.collisions
                         end)
                         win:button("Сбросить к размеру объекта", iw, 24, function()
+                            self:pushHistory("Reset Collision Size")
                             el.collisions = {
                                 { x = 0, y = 0, w = vw, h = vh, one_way = cur_ow, is_one_way = cur_ow, top_only = cur_ow }
                             }
@@ -659,12 +884,60 @@ function EditorScene:_initWindows()
                     end
                 end
 
-                -- 4. Other Properties & Actions
+                -- 4. Texture / Sheet / Extra Actions
+                win:separator(10)
+                win:label("TEXTURE / SPRITE", { 0.3, 0.9, 0.6, 1 })
+                if el.sheet then
+                    win:label("Sheet: " .. tostring(el.sheet), { 0.8, 0.4, 1, 1 })
+                    local cur_f = el.frame or "idle"
+                    win:label("Frame: " .. cur_f, { 0.9, 0.9, 0.4, 1 })
+                    win:button("Frame: idle", iw, 22, function() self:pushHistory("Frame idle") el.frame = "idle" end)
+                    win:button("Frame: down", iw, 22, function() self:pushHistory("Frame down") el.frame = "down" end)
+                    win:button("Frame: side", iw, 22, function() self:pushHistory("Frame side") el.frame = "side" end)
+                    win:button("Remove Spritesheet", iw, 22, function() self:pushHistory("Remove Spritesheet") el.sheet = nil end)
+                elseif el.image then
+                    win:label("Texture: " .. tostring(el.image), { 0.85, 0.9, 0.95, 1 })
+                    win:button("Change Texture (Palette)...", iw, 24, function()
+                        local wa = WindowManager.get("win_assets")
+                        if wa then wa:open() WindowManager.bringToFront(wa) end
+                    end, false, { { 0.2, 0.45, 0.65, 1 }, { 0.28, 0.58, 0.8, 1 } })
+                    win:button("Clear Texture (Primitive)", iw, 22, function()
+                        self:pushHistory("Clear Texture")
+                        el.image = nil
+                    end)
+                else
+                    win:label("Texture: None (Primitive Rect)", { 0.6, 0.65, 0.7, 1 })
+                    win:button("+ Assign Texture (Palette)...", iw, 24, function()
+                        local wa = WindowManager.get("win_assets")
+                        if wa then wa:open() WindowManager.bringToFront(wa) end
+                    end, false, { { 0.2, 0.5, 0.35, 1 }, { 0.28, 0.65, 0.45, 1 } })
+                end
+
+                if el.type == "npc" or (el.id and el.id:match("^npc_")) or el.id == "eye" then
+                    win:separator(6)
+                    win:label("NPC SETTINGS", { 0.8, 0.4, 1, 1 })
+                    if not el.sheet then
+                        win:button("Attach Eye Spritesheet", iw, 22, function()
+                            self:pushHistory("Attach Eye Sheet")
+                            el.sheet = "assets/level3/eye.ini"
+                            el.frame = "idle"
+                            el.w = 48
+                            el.h = 48
+                        end)
+                    end
+                end
+
+                if el.type == "bookshelf" or (el.id and el.id:match("^s_f%d_%d")) then
+                    win:separator(6)
+                    win:label("BOOKSHELF SETTINGS", { 0.9, 0.8, 0.3, 1 })
+                    el.has_bomb = win:checkbox("Has Bomb (Бомба)", el.has_bomb == true)
+                    win:button("Variant: Bookshelf 1", iw, 22, function() el.image = "assets/level3/bookshelf1.png" end)
+                    win:button("Variant: Bookshelf 2", iw, 22, function() el.image = "assets/level3/bookshelf2.png" end)
+                    win:button("Variant: Bookshelf 3", iw, 22, function() el.image = "assets/level3/bookshelf3.png" end)
+                end
+
                 win:separator(10)
                 win:label("PROPERTIES / ACTIONS", { 0.7, 0.75, 0.8, 1 })
-                if el.image then
-                    win:label("Image: " .. tostring(el.image), { 0.7, 0.7, 0.7, 1 })
-                end
                 if el.on_interact then
                     win:label("Action: " .. tostring(el.on_interact), { 0.4, 0.9, 0.5, 1 })
                 end
@@ -726,6 +999,109 @@ function EditorScene:_initWindows()
 
             r.camera_w = win:numberStepper("Camera W", r.camera_w or r.w or 320, 20, function(v) r.camera_w = math.max(160, v) end)
             r.camera_h = win:numberStepper("Camera H", r.camera_h or r.h or 240, 20, function(v) r.camera_h = math.max(120, v) end)
+
+            win:separator(10)
+            win:label("ROOM BACKGROUND", { 0.3, 0.9, 0.6, 1 })
+            win:label("Wallpaper: " .. tostring(r.bg or "None"), { 0.85, 0.85, 0.85, 1 })
+            win:button("Pick Room BG (Palette)...", iw, 24, function()
+                local wa = WindowManager.get("win_assets")
+                if wa then
+                    self.assets_filter = "bg"
+                    wa:open()
+                    WindowManager.bringToFront(wa)
+                end
+            end, false, { { 0.2, 0.45, 0.6, 1 }, { 0.28, 0.58, 0.75, 1 } })
+
+            local bg_list = {
+                "assets/level0/desktop/wp.png",
+                "assets/level1/wp.png",
+                "assets/level1/sublv2/wp.png",
+                "assets/level2/wp.png",
+                "assets/level3/wp.png",
+                "assets/test_camera/wp_long.png",
+                "assets/bg/bossbg.png",
+                "assets/bg/level3_bg.png"
+            }
+            win:button("Cycle Common Room BG", iw, 22, function()
+                local cur_idx = 0
+                for idx, bpath in ipairs(bg_list) do
+                    if r.bg == bpath then cur_idx = idx break end
+                end
+                local next_idx = (cur_idx % #bg_list) + 1
+                self:pushHistory("Cycle Room BG")
+                r.bg = bg_list[next_idx]
+                self:setStatus("Room BG set to: " .. r.bg)
+            end)
+            if r.bg then
+                win:button("Clear Room BG", iw, 20, function()
+                    self:pushHistory("Clear Room BG")
+                    r.bg = nil
+                    self:setStatus("Room BG cleared")
+                end)
+            end
+
+            -- Background Repeat / Tiling Mode
+            local rep_str = "Off (Без зацикливания)"
+            if r.bg_repeat == true or r.bg_repeat == "both" or r.bg_repeat == "repeat" then
+                rep_str = "Repeat Both (X + Y)"
+            elseif r.bg_repeat == "x" or r.bg_repeat == "repeat-x" then
+                rep_str = "Repeat X Only (Горизонтально)"
+            elseif r.bg_repeat == "y" or r.bg_repeat == "repeat-y" then
+                rep_str = "Repeat Y Only (Вертикально)"
+            end
+            win:label("Tiling / Зацикливание: " .. rep_str, { 0.9, 0.8, 0.3, 1 })
+            win:button("Cycle Tiling: " .. rep_str, iw, 24, function()
+                self:pushHistory("Cycle Tiling")
+                if not r.bg_repeat or r.bg_repeat == "none" or r.bg_repeat == false then
+                    r.bg_repeat = "both"
+                elseif r.bg_repeat == "both" or r.bg_repeat == true or r.bg_repeat == "repeat" then
+                    r.bg_repeat = "x"
+                elseif r.bg_repeat == "x" or r.bg_repeat == "repeat-x" then
+                    r.bg_repeat = "y"
+                else
+                    r.bg_repeat = "none"
+                end
+                self:setStatus("Background tiling: " .. tostring(r.bg_repeat))
+            end, false, { { 0.5, 0.38, 0.15, 1 }, { 0.65, 0.5, 0.2, 1 } })
+
+            if not p.fullscreen then
+                win:separator(8)
+                win:label("CRT MONITOR BG", { 0.7, 0.75, 0.8, 1 })
+                win:label("Parent BG: " .. tostring(p.bg or "None"), { 0.85, 0.85, 0.85, 1 })
+                local crt_bg_list = {
+                    "assets/bg/intro_bg.png",
+                    "assets/bg/level3_bg.png",
+                    "assets/bg/girls_room.png",
+                    "assets/bg/main_menu.png",
+                    "assets/bg/platforming_section.png",
+                    "assets/bg/the_end_bg.png"
+                }
+                win:button("Cycle CRT BG", iw, 22, function()
+                    local cur_idx = 0
+                    for idx, bpath in ipairs(crt_bg_list) do
+                        if p.bg == bpath then cur_idx = idx break end
+                    end
+                    local next_idx = (cur_idx % #crt_bg_list) + 1
+                    self:pushHistory("Cycle CRT BG")
+                    p.bg = crt_bg_list[next_idx]
+                    self:setStatus("CRT BG set to: " .. p.bg)
+                end)
+                win:button("Pick CRT BG (Palette)...", iw, 22, function()
+                    local wa = WindowManager.get("win_assets")
+                    if wa then
+                        self.assets_filter = "bg"
+                        wa:open()
+                        WindowManager.bringToFront(wa)
+                    end
+                end)
+                if p.bg then
+                    win:button("Clear CRT BG", iw, 20, function()
+                        self:pushHistory("Clear CRT BG")
+                        p.bg = nil
+                        self:setStatus("CRT BG cleared")
+                    end)
+                end
+            end
         end
     })
     WindowManager.add(win_settings)
@@ -755,6 +1131,159 @@ function EditorScene:_initWindows()
         end
     })
     WindowManager.add(win_tree)
+
+    -- 5. Asset / Texture Browser Window
+    self.assets_filter = "all"
+    self.all_assets_cache = nil
+
+    local function getAssetsList()
+        if not self.all_assets_cache then
+            local list = {}
+            local function scan(dir)
+                if love and love.filesystem and love.filesystem.getInfo(dir) then
+                    local names = love.filesystem.getDirectoryItems(dir)
+                    table.sort(names)
+                    for _, name in ipairs(names) do
+                        local path = (dir == "" or dir == ".") and name or (dir .. "/" .. name)
+                        local info = love.filesystem.getInfo(path)
+                        if info then
+                            if info.type == "directory" then
+                                scan(path)
+                            elseif info.type == "file" and (name:match("%.png$") or name:match("%.ini$")) then
+                                table.insert(list, path)
+                            end
+                        end
+                    end
+                end
+            end
+            scan("assets")
+            self.all_assets_cache = list
+        end
+        return self.all_assets_cache
+    end
+
+    local win_assets = EditorWindow.new({
+        id = "win_assets",
+        title = "Assets & Textures Palette",
+        x = 300,
+        y = 56,
+        w = 380,
+        h = 650,
+        visible = false,
+        resizable = true,
+        draw_content = function(win, ix, iy, iw, ih, mx, my)
+            local assets = getAssetsList()
+            win:label("CATEGORIES", { 0.4, 0.8, 1, 1 })
+
+            local function filterBtn(label, cat, btn_w)
+                local is_active = (self.assets_filter == cat)
+                win:button(label, btn_w, 22, function() self.assets_filter = cat end, is_active)
+            end
+
+            filterBtn("All (" .. #assets .. ")", "all", iw)
+            filterBtn("Backgrounds", "bg", iw)
+            filterBtn("Props & Items", "props", iw)
+            filterBtn("Level 1 Assets", "level1", iw)
+            filterBtn("Level 2 Assets", "level2", iw)
+            filterBtn("Level 3 Assets", "level3", iw)
+            filterBtn("NPC & Sheets", "npc", iw)
+
+            win:separator(10)
+            win:label("ASSETS (" .. self.assets_filter:upper() .. ")", { 1, 0.85, 0.3, 1 })
+
+            local filtered = {}
+            for _, path in ipairs(assets) do
+                local match = false
+                if self.assets_filter == "all" then
+                    match = true
+                elseif self.assets_filter == "bg" then
+                    match = path:find("assets/bg/") or path:find("wp%.png$") or path:find("terminal_bg")
+                elseif self.assets_filter == "level1" then
+                    match = path:find("assets/level1/")
+                elseif self.assets_filter == "level2" then
+                    match = path:find("assets/level2/")
+                elseif self.assets_filter == "level3" then
+                    match = path:find("assets/level3/")
+                elseif self.assets_filter == "props" then
+                    match = (path:find("%.png$") and not path:find("assets/bg/") and not path:find("wp%.png$") and not path:find("taskbar"))
+                elseif self.assets_filter == "npc" then
+                    match = path:find("eye") or path:find("rage")
+                end
+                if match then
+                    table.insert(filtered, path)
+                end
+            end
+
+            for _, path in ipairs(filtered) do
+                local img = getImage(path)
+                local dims = ""
+                if img then
+                    dims = string.format(" (%dx%d)", img:getWidth(), img:getHeight())
+                end
+                local bname = path:match("([^/\\]+)$") or path
+                win:label(bname .. dims, { 0.85, 0.9, 0.95, 1 })
+
+                -- Actions
+                if self.selected_element then
+                    win:button("Apply to: " .. tostring(self.selected_element.id), iw, 22, function()
+                        self:pushHistory("Apply Texture")
+                        local el = self.selected_element
+                        if path:match("%.ini$") then
+                            el.sheet = path
+                            el.type = "npc"
+                        else
+                            el.image = path
+                            if not el.custom_size and img then
+                                el.w = img:getWidth()
+                                el.h = img:getHeight()
+                            end
+                        end
+                        self:setStatus("Applied: " .. path .. " to " .. tostring(el.id))
+                    end, false, { { 0.15, 0.45, 0.35, 1 }, { 0.2, 0.6, 0.45, 1 } })
+                end
+
+                win:button("+ Spawn Object with Texture", iw, 22, function()
+                    self:pushHistory("Spawn Object")
+                    local r = (self.level_data and self.level_data.room) or {}
+                    local spawn_x = math.floor((r.w or 320) / 2)
+                    local spawn_y = math.floor((r.h or 240) / 2)
+                    local new_id = (bname:gsub("%.%w+$", "")) .. "_" .. tostring(math.random(100, 999))
+                    local new_el = {
+                        id = new_id,
+                        type = path:match("%.ini$") and "npc" or "element",
+                        x = self:snap(spawn_x - 16),
+                        y = self:snap(spawn_y - 16),
+                        z_index = 5
+                    }
+                    if path:match("%.ini$") then
+                        new_el.sheet = path
+                        new_el.frame = "idle"
+                        new_el.w = 48
+                        new_el.h = 48
+                        new_el.is_solid = false
+                    else
+                        new_el.image = path
+                        if img then
+                            new_el.w = img:getWidth()
+                            new_el.h = img:getHeight()
+                        end
+                        new_el.is_solid = false
+                    end
+                    table.insert(self.level_data.elements, new_el)
+                    self:selectElement(#self.level_data.elements)
+                    self:setStatus("Spawned: " .. new_id)
+                end)
+
+                if path:find("%.png$") then
+                    win:button("Set as Room BG", iw, 20, function()
+                        self:setRoomBackground(path)
+                    end, false, { { 0.25, 0.3, 0.42, 1 }, { 0.35, 0.4, 0.55, 1 } })
+                end
+                win:separator(4)
+            end
+        end
+    })
+    WindowManager.add(win_assets)
 end
 
 function EditorScene:enter(path)
@@ -770,6 +1299,12 @@ end
 function EditorScene:update(dt)
     if self.status_timer > 0 then
         self.status_timer = self.status_timer - dt
+    end
+    if self.nudge_timer and self.nudge_timer > 0 then
+        self.nudge_timer = self.nudge_timer - dt
+        if self.nudge_timer <= 0 then
+            self:flushNudge()
+        end
     end
 end
 
@@ -1125,7 +1660,22 @@ function EditorScene:drawCanvas()
         local img = getImage(r.bg)
         if img then
             love.graphics.setColor(1, 1, 1, 1)
-            love.graphics.draw(img, sx, sy, 0, self.zoom, self.zoom)
+            local rep = r.bg_repeat
+            if rep and rep ~= false and rep ~= "none" then
+                local iw = img:getWidth()
+                local ih = img:getHeight()
+                local rep_x = (rep == true or rep == "both" or rep == "x" or rep == "repeat" or rep == "repeat-x")
+                local rep_y = (rep == true or rep == "both" or rep == "y" or rep == "repeat" or rep == "repeat-y")
+                local max_x = rep_x and rw or iw
+                local max_y = rep_y and rh or ih
+                for bx = 0, max_x - 1, iw do
+                    for by = 0, max_y - 1, ih do
+                        love.graphics.draw(img, sx + bx * self.zoom, sy + by * self.zoom, 0, self.zoom, self.zoom)
+                    end
+                end
+            else
+                love.graphics.draw(img, sx, sy, 0, self.zoom, self.zoom)
+            end
         end
     end
 
@@ -1154,7 +1704,7 @@ function EditorScene:drawCanvas()
     -- Draw Elements
     local els = (self.level_data and self.level_data.elements) or {}
     for i, el in ipairs(els) do
-        local vw, vh, img, iw, ih = self:resolveVisual(el)
+        local vw, vh, img, iw, ih, sheet = self:resolveVisual(el)
         local ex, ey = self:worldToScreen(el.x or 0, el.y or 0)
         local ew = vw * self.zoom
         local eh = vh * self.zoom
@@ -1182,6 +1732,9 @@ function EditorScene:drawCanvas()
                 local title_txt = (el.title or el.id or "Window") .. (el.visible == false and " [Hidden]" or "")
                 love.graphics.print(title_txt, ex + 6, ey + 3)
             end
+        elseif sheet then
+            love.graphics.setColor(1, 1, 1, 1)
+            sheet:drawFrame(el.frame or "idle", ex, ey, 0, self.zoom, self.zoom)
         elseif img then
             love.graphics.setColor(1, 1, 1, 1)
             if el.custom_size and iw > 0 and ih > 0 then
@@ -1212,6 +1765,35 @@ function EditorScene:drawCanvas()
             end
             love.graphics.setColor(0.5, 0.6, 0.75, 0.8)
             love.graphics.rectangle("line", ex, ey, ew, eh)
+        end
+
+        -- NPC badge tag
+        if el.type == "npc" or sheet or (el.id and (el.id:match("^npc_") or el.id == "eye")) then
+            love.graphics.setColor(0.65, 0.25, 0.95, 0.9)
+            love.graphics.rectangle("fill", ex, ey - 14, 32, 12, 2, 2)
+            love.graphics.setColor(1, 1, 1, 1)
+            if self.font_small then
+                love.graphics.setFont(self.font_small)
+                love.graphics.print("NPC", ex + 5, ey - 15)
+            end
+        end
+
+        -- Bomb marker on bookshelves in editor
+        if (el.type == "bookshelf" or (el.id and el.id:match("^s_f%d_%d"))) and el.has_bomb then
+            local bcx = ex + ew / 2
+            local bcy = ey + eh / 2
+            love.graphics.setColor(1, 0.15, 0.15, 0.85)
+            love.graphics.circle("fill", bcx, bcy, 9 * self.zoom)
+            love.graphics.setColor(1, 1, 1, 0.95)
+            love.graphics.setLineWidth(2)
+            love.graphics.circle("line", bcx, bcy, 9 * self.zoom)
+            love.graphics.setLineWidth(1)
+            if self.font_small then
+                love.graphics.setFont(self.font_small)
+                local bw = self.font_small:getWidth("B")
+                local bh = self.font_small:getHeight()
+                love.graphics.print("B", bcx - bw / 2, bcy - bh / 2)
+            end
         end
 
         -- 2. Collision rendering (Rendered accurately with cyan/yellow or green)
@@ -1338,6 +1920,18 @@ function EditorScene:getTopBarButtons()
             onClick = function() self:saveLevel() end
         },
         {
+            label = string.format("Undo (%d)", #self.undo_stack),
+            w = 88,
+            active = (#self.undo_stack > 0),
+            onClick = function() self:undo() end
+        },
+        {
+            label = string.format("Redo (%d)", #self.redo_stack),
+            w = 88,
+            active = (#self.redo_stack > 0),
+            onClick = function() self:redo() end
+        },
+        {
             label = "Playtest (F5)",
             w = 105,
             active = false,
@@ -1375,6 +1969,14 @@ function EditorScene:getTopBarButtons()
             label = "Inspector",
             w = 78,
             onClick = function() WindowManager.get("win_inspector"):toggle() end
+        },
+        {
+            label = "Assets",
+            w = 64,
+            onClick = function()
+                local wa = WindowManager.get("win_assets")
+                if wa then wa:toggle() if wa.visible then WindowManager.bringToFront(wa) end end
+            end
         },
         {
             label = "Settings",
@@ -1454,7 +2056,7 @@ function EditorScene:drawBottomBar()
 
     love.graphics.setColor(0.8, 0.85, 0.9, 1)
     if self.font_body then love.graphics.setFont(self.font_body) end
-    local info = string.format("Cursor: (%d, %d) | Zoom: %d%% | Grid: %dpx [%s] | Mode: [%s] (Keys: [Arrows] Move, [Alt+Arrows] Resize, [Shift] Fast, [V] Obj, [C] Col, [Del] Del)",
+    local info = string.format("Cursor: (%d, %d) | Zoom: %d%% | Grid: %dpx [%s] | Mode: [%s] (Keys: [Ctrl+Z] Undo, [Ctrl+Y] Redo, [Arrows] Move, [Alt+Arrows] Resize, [V] Obj, [C] Col, [Del] Del)",
         wx, wy, math.floor(self.zoom * 100), self.grid_size, self.grid_snap and "ON" or "OFF", self.edit_mode:upper())
     love.graphics.print(info, 24, 1054)
 
@@ -1579,10 +2181,14 @@ function EditorScene:mousepressed(vx, vy, button, istouch, presses)
             if hit_box_idx then
                 self.selected_collision_idx = hit_box_idx
                 local b = el.collisions[hit_box_idx]
+                self.drag_snapshot = deepCopy(self.level_data)
+                self.drag_snapshot_sel_id = el.id
                 if is_corner_resize then
                     self.resizing_collision = true
+                    self.drag_action = "Resize Collision"
                 else
                     self.dragging_collision = true
+                    self.drag_action = "Move Collision"
                     self.drag_ox = wx - ((el.x or 0) + (b.x or 0))
                     self.drag_oy = wy - ((el.y or 0) + (b.y or 0))
                 end
@@ -1630,10 +2236,22 @@ function EditorScene:mousepressed(vx, vy, button, istouch, presses)
                 self.click_hits = hits
                 self.drag_ox = wx - (self.selected_element.x or 0)
                 self.drag_oy = wy - (self.selected_element.y or 0)
+                self.drag_snapshot = deepCopy(self.level_data)
+                self.drag_snapshot_sel_id = self.selected_element.id
+                self.drag_action = "Move " .. tostring(self.selected_element.id)
             else
                 local top_idx = hits[1]
                 self:selectElement(top_idx)
-                self.click_hits = nil
+                self.drag_candidate = true
+                self.dragging_element = false
+                self.drag_start_vx = vx
+                self.drag_start_vy = vy
+                self.click_hits = hits
+                self.drag_ox = wx - (self.selected_element.x or 0)
+                self.drag_oy = wy - (self.selected_element.y or 0)
+                self.drag_snapshot = deepCopy(self.level_data)
+                self.drag_snapshot_sel_id = self.selected_element.id
+                self.drag_action = "Move " .. tostring(self.selected_element.id)
 
                 if #hits > 1 then
                     local target_el = els[top_idx]
@@ -1733,6 +2351,21 @@ function EditorScene:mousereleased(vx, vy, button, istouch, presses)
             end
         end
 
+        if (self.dragging_element or self.dragging_collision or self.resizing_collision) and self.drag_snapshot then
+            table.insert(self.undo_stack, {
+                data = self.drag_snapshot,
+                selected_id = self.drag_snapshot_sel_id,
+                action = self.drag_action or "Move"
+            })
+            if #self.undo_stack > (self.max_history or 60) then
+                table.remove(self.undo_stack, 1)
+            end
+            self.redo_stack = {}
+        end
+
+        self.drag_snapshot = nil
+        self.drag_snapshot_sel_id = nil
+        self.drag_action = nil
         self.dragging_element = false
         self.drag_candidate = false
         self.click_hits = nil
@@ -1815,7 +2448,15 @@ function EditorScene:keypressed(key, scancode, isrepeat)
     end
 
     -- Workspace Keys
-    if ctrl and key == "s" then
+    if ctrl and (key == "z" or key == "y") then
+        local shift = love.keyboard.isDown("lshift") or love.keyboard.isDown("rshift")
+        if key == "y" or (key == "z" and shift) then
+            self:redo()
+        else
+            self:undo()
+        end
+        return
+    elseif ctrl and key == "s" then
         self:saveLevel()
         return
     elseif ctrl and key == "d" then
@@ -1846,6 +2487,12 @@ function EditorScene:keypressed(key, scancode, isrepeat)
 
     -- Nudge or resize selected element / collision box with arrows
     if self.selected_element and (key == "left" or key == "right" or key == "up" or key == "down") then
+        if not self.nudge_snapshot then
+            self.nudge_snapshot = deepCopy(self.level_data)
+            self.nudge_snapshot_sel_id = self.selected_element and self.selected_element.id
+        end
+        self.nudge_timer = 0.4
+
         local shift = love.keyboard.isDown("lshift") or love.keyboard.isDown("rshift")
         local alt = love.keyboard.isDown("lalt") or love.keyboard.isDown("ralt")
         local step = shift and self.grid_size or 1

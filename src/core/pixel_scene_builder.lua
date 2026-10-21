@@ -15,8 +15,13 @@ function PixelSceneBuilder:setRoomBounds(w, h)
     return self
 end
 
-function PixelSceneBuilder:background(path_or_color)
-    self.scene:setBackground(path_or_color)
+function PixelSceneBuilder:background(path_or_color, repeat_mode)
+    self.scene:setBackground(path_or_color, repeat_mode)
+    return self
+end
+
+function PixelSceneBuilder:bgRepeat(mode)
+    self.scene:setBgRepeat(mode)
     return self
 end
 

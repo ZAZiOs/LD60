@@ -77,7 +77,7 @@ function LevelLoader.build(data, custom_logic)
         :setRoomBounds(room.w or 320, room.h or 240)
 
     if room.bg then
-        b:background(room.bg)
+        b:background(room.bg, room.bg_repeat)
     end
 
     if room.cursor then
@@ -151,6 +151,18 @@ function LevelLoader.build(data, custom_logic)
         end)
     end
 
+    if room_logic and room_logic.onDraw then
+        b:onDraw(function(sc)
+            room_logic.onDraw(sc)
+        end)
+    end
+
+    if room_logic and room_logic.onMouse then
+        b:onMouse(function(sc, action, gx, gy, button)
+            room_logic.onMouse(sc, action, gx, gy, button)
+        end)
+    end
+
     local desktop = b:build()
 
     for _, binding in ipairs(script_bindings) do
@@ -195,12 +207,24 @@ function LevelLoader.build(data, custom_logic)
     })
 
     local shader_name = (parent.shaders and parent.shaders[1]) or "crt"
-    local draw_fn = LevelLoader.shaders[shader_name] or LevelLoader.shaders.crt
+    local default_draw_fn = LevelLoader.shaders[shader_name] or LevelLoader.shaders.crt
+    local draw_fn = function(s)
+        if room_logic and room_logic.screen_draw_fn then
+            room_logic.screen_draw_fn(s, default_draw_fn)
+        else
+            default_draw_fn(s)
+        end
+    end
 
     local scene = GameScene.new({
         bg = parent.bg,
         screen = screen,
         screen_draw_fn = draw_fn,
+        on_bg_click = function(self, vx, vy, button)
+            if room_logic and room_logic.on_bg_click then
+                room_logic.on_bg_click(desktop, self, vx, vy, button)
+            end
+        end,
         enter = function(self, ...)
             local mus = parent.music
             if mus and mus.track and mus.track ~= "" then
@@ -261,6 +285,13 @@ function LevelLoader.registerAll(base_dir)
                         return LevelLoader.loadFromFile(path)
                     end)
                     table.insert(registered, scene_name)
+
+                    -- Also register short name (e.g. "level0", "level1") so transitions to "level0" seamlessly use the INI
+                    if base_name ~= scene_name then
+                        SceneManager.register(base_name, function()
+                            return LevelLoader.loadFromFile(path)
+                        end)
+                    end
                 end
             end
         end

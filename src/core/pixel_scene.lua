@@ -69,7 +69,10 @@ function PixelScene:setPlayer(player)
 end
 
 
-function PixelScene:setBackground(path_or_color)
+function PixelScene:setBackground(path_or_color, repeat_mode)
+    if repeat_mode ~= nil then
+        self.bg_repeat = repeat_mode
+    end
     if type(path_or_color) == "string" then
         if love and love.filesystem and love.filesystem.getInfo(path_or_color) then
             local ok, img = pcall(love.graphics.newImage, path_or_color)
@@ -84,6 +87,11 @@ function PixelScene:setBackground(path_or_color)
         path_or_color:setFilter("nearest", "nearest")
         self.bg_image = path_or_color
     end
+    return self
+end
+
+function PixelScene:setBgRepeat(repeat_mode)
+    self.bg_repeat = repeat_mode
     return self
 end
 
@@ -461,7 +469,19 @@ function PixelScene:drawElement(el, shader)
         love.graphics.draw(current_img, el.x, el.y)
     end
     if el.color then
-        love.graphics.setColor(el.color[1], el.color[2], el.color[3], el.color[4] or 1)
+        local c = el.color
+        if type(c) == "table" and c[1] and c[2] and c[3] then
+            love.graphics.setColor(c[1], c[2], c[3], c[4] or 1)
+        elseif type(c) == "string" then
+            local r, g, b, a = c:match("([%d%.]+)%s*,%s*([%d%.]+)%s*,%s*([%d%.]+)%s*,?%s*([%d%.]*)")
+            if r and g and b then
+                love.graphics.setColor(tonumber(r) or 1, tonumber(g) or 1, tonumber(b) or 1, tonumber(a) or 1)
+            else
+                love.graphics.setColor(1, 1, 1, 1)
+            end
+        else
+            love.graphics.setColor(1, 1, 1, 1)
+        end
         if el.hollow then
             local line_width = 5
             love.graphics.rectangle("fill", el.x, el.y, el.w, line_width) -- top
@@ -494,7 +514,24 @@ function PixelScene:draw()
 
     if self.bg_image then
         love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.draw(self.bg_image, 0, 0)
+        if self.bg_repeat and self.bg_repeat ~= false and self.bg_repeat ~= "none" then
+            local rep = self.bg_repeat
+            local img_w = self.bg_image:getWidth()
+            local img_h = self.bg_image:getHeight()
+            local rw = self.room_width or 320
+            local rh = self.room_height or 240
+            local rep_x = (rep == true or rep == "both" or rep == "x" or rep == "repeat" or rep == "repeat-x")
+            local rep_y = (rep == true or rep == "both" or rep == "y" or rep == "repeat" or rep == "repeat-y")
+            local max_x = rep_x and rw or img_w
+            local max_y = rep_y and rh or img_h
+            for bx = 0, max_x - 1, img_w do
+                for by = 0, max_y - 1, img_h do
+                    love.graphics.draw(self.bg_image, bx, by)
+                end
+            end
+        else
+            love.graphics.draw(self.bg_image, 0, 0)
+        end
     end
 
     local shader = getOutlineShader()
