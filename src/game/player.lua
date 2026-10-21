@@ -1,4 +1,5 @@
 local SpritesheetManager = require("src.core.spritesheet_manager")
+local Controls = require("src.core.controls")
 
 local function getElementBoxes(el)
     if el.getCollisionBoxes then
@@ -104,6 +105,27 @@ function Player.new(opts)
     self.tail_vy = 0
     self.tail_time = 0
 
+    self.max_dashes = opts.max_dashes or 1
+    self.dashes = self.max_dashes
+    self.dash_speed = opts.dash_speed or 280
+    self.dash_duration = opts.dash_duration or 0.15
+    self.dash_cooldown_time = opts.dash_cooldown or 0.2
+    self.dash_timer = 0
+    self.dash_cooldown = 0
+    self.dash_dir_x = 0
+    self.dash_dir_y = 0
+    self.dash_trail = {}
+    self.dash_trail_timer = 0
+
+    self.max_stamina = opts.max_stamina or 110
+    self.stamina = self.max_stamina
+    self.is_wall_holding = false
+    self.climb_up_speed = opts.climb_up_speed or 55
+    self.climb_down_speed = opts.climb_down_speed or 85
+    self.climb_slide_speed = opts.climb_slide_speed or 40
+    self.climb_jump_force = opts.climb_jump_force or -255
+    self.climb_jump_cooldown = 0
+
     local ini_path = opts.sheet or "assets/rage/rage_sh.ini"
     self.anim = SpritesheetManager.createAnimation(ini_path, "idle")
 
@@ -131,10 +153,79 @@ function Player:wallJump(dir)
     self.wall_coyote_timer = 0
     self.jump_buffer_timer = 0
     self.is_wall_sliding = false
+    self.is_wall_holding = false
     self.is_grounded = false
     self.coyote_timer = 0
     self.scale_x = 0.74
     self.scale_y = 1.32
+end
+
+function Player:climbJump(dir)
+    local kick_dir = dir or (self.wall_dir ~= 0 and self.wall_dir) or (self.last_wall_dir ~= 0 and self.last_wall_dir) or self.facing
+    self.vy = self.climb_jump_force
+    self.vx = 0
+    self.facing = kick_dir
+    self.stamina = math.max(0, self.stamina - 27)
+    self.climb_jump_cooldown = 0.20
+    self.jump_buffer_timer = 0
+    self.coyote_timer = 0
+    self.wall_coyote_timer = 0
+    self.is_wall_holding = false
+    self.is_wall_sliding = false
+    self.is_grounded = false
+    self.scale_x = 0.78
+    self.scale_y = 1.30
+end
+
+function Player:dash()
+    if self.dashes <= 0 or self.dash_cooldown > 0 or self.is_dead or self.is_hidden then
+        return false
+    end
+
+    local input_x, input_y = Controls.getDirection()
+
+    if input_x == 0 and input_y == 0 then
+        input_x = (self.facing ~= 0) and self.facing or 1
+        input_y = 0
+    end
+
+    local len = math.sqrt(input_x * input_x + input_y * input_y)
+    local dir_x = input_x / len
+    local dir_y = input_y / len
+
+    self.dashes = self.dashes - 1
+    self.dash_timer = self.dash_duration
+    self.dash_cooldown = self.dash_cooldown_time
+    self.dash_dir_x = dir_x
+    self.dash_dir_y = dir_y
+
+    self.vx = dir_x * self.dash_speed
+    self.vy = dir_y * self.dash_speed
+
+    if input_x ~= 0 then
+        self.facing = (input_x > 0) and 1 or -1
+    end
+
+    if dir_y == 0 then
+        self.scale_x = 1.45
+        self.scale_y = 0.65
+    elseif dir_x == 0 then
+        self.scale_x = 0.65
+        self.scale_y = 1.45
+    else
+        self.scale_x = 1.25
+        self.scale_y = 0.8
+    end
+
+    self.is_wall_sliding = false
+    self.is_wall_holding = false
+    self.wall_dir = 0
+    self.wall_jump_lock = 0
+    self.wall_kick_timer = 0
+    self.jump_buffer_timer = 0
+    self.is_grounded = false
+
+    return true
 end
 
 function Player:getHitbox()
@@ -225,12 +316,12 @@ function Player:update(dt, scene)
     self.ground_platform = nil
 
     local move = 0
-    local down_held = love.keyboard.isDown("down") or love.keyboard.isDown("s")
+    local down_held = Controls.isDown("down")
 
-    if love.keyboard.isDown("left") or love.keyboard.isDown("a") then
+    if Controls.isDown("left") then
         move = move - 1
     end
-    if love.keyboard.isDown("right") or love.keyboard.isDown("d") then
+    if Controls.isDown("right") then
         move = move + 1
     end
 
@@ -238,55 +329,96 @@ function Player:update(dt, scene)
         self.same_wall_cooldown = math.max(0, self.same_wall_cooldown - dt)
     end
 
-    if self.wall_jump_lock > 0 then
-        self.wall_jump_lock = math.max(0, self.wall_jump_lock - dt)
-        local flight_dir = -self.last_jumped_wall_dir
-        if flight_dir ~= 0 and move == flight_dir then
-            self.vx = flight_dir * math.max(self.speed, math.abs(self.vx))
+    if self.climb_jump_cooldown > 0 then
+        self.climb_jump_cooldown = math.max(0, self.climb_jump_cooldown - dt)
+    end
+
+    if self.dash_cooldown > 0 then
+        self.dash_cooldown = math.max(0, self.dash_cooldown - dt)
+    end
+
+    local is_dashing = (self.dash_timer > 0)
+    if is_dashing then
+        self.dash_timer = math.max(0, self.dash_timer - dt)
+        self.vx = self.dash_dir_x * self.dash_speed
+        self.vy = self.dash_dir_y * self.dash_speed
+        self.is_wall_sliding = false
+        self.wall_dir = 0
+        self.wall_jump_lock = 0
+
+        self.dash_trail_timer = (self.dash_trail_timer or 0) + dt
+        if self.dash_trail_timer >= 0.025 then
+            self.dash_trail_timer = 0
+            table.insert(self.dash_trail, {
+                x = self.x,
+                y = self.y,
+                facing = self.facing,
+                scale_x = self.scale_x,
+                scale_y = self.scale_y,
+                alpha = 0.55,
+                life = 0.18,
+                max_life = 0.18
+            })
         end
     else
-        self.vx = move * self.speed
-        if move ~= 0 and not self.is_wall_sliding then
-            self.facing = move
-        end
-    end
-
-    if self.is_grounded then
-        self.coyote_timer = self.coyote_time
-    else
-        self.coyote_timer = math.max(0, self.coyote_timer - dt)
-    end
-
-    if self.jump_buffer_timer > 0 then
-        self.jump_buffer_timer = math.max(0, self.jump_buffer_timer - dt)
-        if self.coyote_timer > 0 then
-            self:jump()
-        elseif (self.is_wall_sliding or self.wall_coyote_timer > 0) and self:canWallJump(scene) then
-            self:wallJump()
-        end
-    end
-
-    local jump_held = love.keyboard.isDown("space") or love.keyboard.isDown("up") or love.keyboard.isDown("w")
-
-    if not self.is_grounded then
-        local current_gravity = self.gravity_fall
-
-        if self.vy < 0 then
-            if jump_held then
-                if math.abs(self.vy) < 30 then
-                    current_gravity = self.gravity_apex
-                else
-                    current_gravity = self.gravity_held
-                end
-
-            else
-                current_gravity = self.gravity_cut
+        if self.wall_jump_lock > 0 then
+            self.wall_jump_lock = math.max(0, self.wall_jump_lock - dt)
+            local flight_dir = -self.last_jumped_wall_dir
+            if flight_dir ~= 0 and move == flight_dir then
+                self.vx = flight_dir * math.max(self.speed, math.abs(self.vx))
             end
         else
-            current_gravity = self.gravity_fall
+            self.vx = move * self.speed
+            if move ~= 0 and not self.is_wall_sliding then
+                self.facing = move
+            end
         end
 
-        self.vy = math.min(self.max_fall, self.vy + current_gravity * dt)
+        if self.is_grounded then
+            self.coyote_timer = self.coyote_time
+        else
+            self.coyote_timer = math.max(0, self.coyote_timer - dt)
+        end
+
+        if self.jump_buffer_timer > 0 then
+            self.jump_buffer_timer = math.max(0, self.jump_buffer_timer - dt)
+            if self.coyote_timer > 0 then
+                self:jump()
+            elseif (self.is_wall_holding or self.is_wall_sliding or self.wall_coyote_timer > 0) and self:canWallJump(scene) then
+                local kick_w_dir = (self.wall_dir ~= 0 and self.wall_dir) or (self.last_wall_dir ~= 0 and self.last_wall_dir) or self.facing
+                local away_pressed = (kick_w_dir == -1 and Controls.isDown("right"))
+                                  or (kick_w_dir == 1 and Controls.isDown("left"))
+                local hold_climb = Controls.isDown("climb")
+
+                if self.is_wall_holding and hold_climb and not away_pressed and self.stamina >= 10 then
+                    self:climbJump(kick_w_dir)
+                else
+                    self:wallJump(kick_w_dir)
+                end
+            end
+        end
+
+        local jump_held = Controls.isDown("jump")
+
+        if not self.is_grounded then
+            local current_gravity = self.gravity_fall
+
+            if self.vy < 0 then
+                if jump_held then
+                    if math.abs(self.vy) < 30 then
+                        current_gravity = self.gravity_apex
+                    else
+                        current_gravity = self.gravity_held
+                    end
+                else
+                    current_gravity = self.gravity_cut
+                end
+            else
+                current_gravity = self.gravity_fall
+            end
+
+            self.vy = math.min(self.max_fall, self.vy + current_gravity * dt)
+        end
     end
 
 
@@ -409,7 +541,10 @@ function Player:update(dt, scene)
     end
 
     if self.is_grounded then
+        self.dashes = self.max_dashes
+        self.stamina = self.max_stamina
         self.is_wall_sliding = false
+        self.is_wall_holding = false
         self.wall_dir = 0
         self.wall_coyote_timer = 0
         self.wall_kick_timer = 0
@@ -429,31 +564,81 @@ function Player:update(dt, scene)
             self.last_jumped_wall_dir = 0
         end
 
-        local pressing_into_wall = (wall_contact_dir == -1 and (love.keyboard.isDown("left") or love.keyboard.isDown("a")))
-                                or (wall_contact_dir == 1 and (love.keyboard.isDown("right") or love.keyboard.isDown("d")))
+        local pressing_into_wall = (wall_contact_dir == -1 and Controls.isDown("left"))
+                                or (wall_contact_dir == 1 and Controls.isDown("right"))
 
         local can_slide_on_this_wall = (wall_contact_dir ~= 0)
                                     and not (wall_contact_dir == self.last_jumped_wall_dir and self.same_wall_cooldown > 0)
+                                    and (self.climb_jump_cooldown <= 0)
                                     and self:canWallJump(scene)
 
-        if can_slide_on_this_wall and self.vy > 0 and pressing_into_wall then
-            self.is_wall_sliding = true
+        local hold_climb = Controls.isDown("climb")
+        local is_climbing = false
+
+        if can_slide_on_this_wall and hold_climb and self.stamina > 0 then
+            is_climbing = true
+            self.is_wall_holding = true
+            self.is_wall_sliding = false
             self.wall_dir = wall_contact_dir
             self.last_wall_dir = wall_contact_dir
             self.wall_coyote_timer = self.wall_coyote_time
             self.facing = wall_contact_dir
 
-            if self.vy > self.wall_slide_speed then
-                self.vy = self.wall_slide_speed
+            local climb_dir = 0
+            if Controls.isDown("up") then
+                climb_dir = climb_dir - 1
             end
-        else
+            if Controls.isDown("down") then
+                climb_dir = climb_dir + 1
+            end
+
+            if climb_dir < 0 then
+                -- Climbing up: consumes stamina faster
+                self.vy = -self.climb_up_speed
+                self.stamina = math.max(0, self.stamina - 45 * dt)
+            elseif climb_dir > 0 then
+                -- Moving down wall: gentle stamina drain
+                self.vy = self.climb_down_speed
+                self.stamina = math.max(0, self.stamina - 10 * dt)
+            else
+                -- Holding still on wall: steady stamina drain
+                self.vy = 0
+                self.stamina = math.max(0, self.stamina - 15 * dt)
+            end
+        elseif can_slide_on_this_wall and hold_climb and self.stamina <= 0 then
+            -- Stamina ran out while holding Z: slide down automatically
+            is_climbing = true
+            self.is_wall_holding = true
             self.is_wall_sliding = false
-            self.wall_dir = 0
-            if can_slide_on_this_wall then
+            self.wall_dir = wall_contact_dir
+            self.last_wall_dir = wall_contact_dir
+            self.wall_coyote_timer = self.wall_coyote_time
+            self.facing = wall_contact_dir
+            self.vy = math.max(self.vy, self.climb_slide_speed)
+        else
+            self.is_wall_holding = false
+        end
+
+        if not is_climbing then
+            if can_slide_on_this_wall and self.vy > 0 and pressing_into_wall then
+                self.is_wall_sliding = true
+                self.wall_dir = wall_contact_dir
                 self.last_wall_dir = wall_contact_dir
                 self.wall_coyote_timer = self.wall_coyote_time
+                self.facing = wall_contact_dir
+
+                if self.vy > self.wall_slide_speed then
+                    self.vy = self.wall_slide_speed
+                end
             else
-                self.wall_coyote_timer = math.max(0, self.wall_coyote_timer - dt)
+                self.is_wall_sliding = false
+                self.wall_dir = 0
+                if can_slide_on_this_wall then
+                    self.last_wall_dir = wall_contact_dir
+                    self.wall_coyote_timer = self.wall_coyote_time
+                else
+                    self.wall_coyote_timer = math.max(0, self.wall_coyote_timer - dt)
+                end
             end
         end
     end
@@ -502,6 +687,14 @@ function Player:update(dt, scene)
             p.y = p.y + p.vy * dt
             p.vx = p.vx * math.max(0, 1 - 3 * dt)
             p.vy = p.vy * math.max(0, 1 - 2 * dt)
+        end
+    end
+
+    for i = #self.dash_trail, 1, -1 do
+        local t = self.dash_trail[i]
+        t.life = t.life - dt
+        if t.life <= 0 then
+            table.remove(self.dash_trail, i)
         end
     end
 
@@ -589,7 +782,9 @@ function Player:update(dt, scene)
     end
 
     if self.anim then
-        if self.is_grounded then
+        if is_dashing then
+            self.anim:play("wallkick")
+        elseif self.is_grounded then
             if down_held and math.abs(self.vx) < 5 then
                 self.anim:play("sit")
             elseif math.abs(self.vx) > 5 then
@@ -598,7 +793,7 @@ function Player:update(dt, scene)
                 self.anim:play("idle")
             end
         else
-            if self.is_wall_sliding then
+            if self.is_wall_holding or self.is_wall_sliding then
                 self.anim:play("wallslide")
             elseif self.wall_kick_timer > 0 then
                 self.anim:play("wallkick")
@@ -684,6 +879,17 @@ function Player:draw()
         return
     end
 
+    -- Render Celeste dash afterimages/ghost trail
+    if #self.dash_trail > 0 and self.anim then
+        for _, t in ipairs(self.dash_trail) do
+            local a = (t.life / t.max_life) * (t.alpha or 0.5)
+            love.graphics.setColor(0.3, 0.75, 1.0, a)
+            local tx = math.floor(t.x + 0.5)
+            local ty = math.floor(t.y + 0.5)
+            self.anim:draw(tx, ty, 0, (t.facing or 1) * (t.scale_x or 1), t.scale_y or 1, 16, 26)
+        end
+    end
+
     if #self.slide_particles > 0 then
         for _, p in ipairs(self.slide_particles) do
             local current_alpha = (p.life / p.max_life) * p.alpha
@@ -706,10 +912,24 @@ function Player:draw()
     end
 
     if self.anim then
-        love.graphics.setColor(1, 1, 1, 1)
+        local r, g, b, a = 1, 1, 1, 1
+        -- Visual indicator for running out of stamina (flashing transparency, faster as stamina depletes)
+        if (self.is_wall_holding or self.is_wall_sliding) and self.stamina < 45 then
+            local ratio = math.max(0, self.stamina / 45) -- 1.0 (at 45) down to 0.0 (at 0)
+            local flash_speed = 10 + (1 - ratio) * 25   -- 10 Hz up to 35 Hz
+            local time = (love.timer and love.timer.getTime()) or (self.tail_time or 0)
+            local wave = 0.5 + 0.5 * math.sin(time * flash_speed * math.pi * 2)
+            a = 0.35 + 0.65 * wave
+            if self.stamina <= 0 then
+                a = 0.3 + 0.7 * (math.sin(time * 40 * math.pi * 2) > 0 and 1 or 0)
+            end
+        end
+
+        love.graphics.setColor(r, g, b, a)
         local draw_x = math.floor(self.x + 0.5)
         local draw_y = math.floor(self.y + 0.5)
         self.anim:draw(draw_x, draw_y, 0, self.facing * self.scale_x, self.scale_y, 16, 26)
+        love.graphics.setColor(1, 1, 1, 1)
     end
 end
 
@@ -721,17 +941,13 @@ function Player:isHoldingKey(key_name)
         end
         return true
     end
-    if key_name == "down" then
-        return love.keyboard.isDown("down") or love.keyboard.isDown("s")
-    elseif key_name == "up" then
-        return love.keyboard.isDown("up") or love.keyboard.isDown("w")
-    elseif key_name == "left" then
-        return love.keyboard.isDown("left") or love.keyboard.isDown("a")
-    elseif key_name == "right" then
-        return love.keyboard.isDown("right") or love.keyboard.isDown("d")
-    else
+    if Controls.isDown(key_name) then
+        return true
+    end
+    if love.keyboard and love.keyboard.isDown then
         return love.keyboard.isDown(key_name)
     end
+    return false
 end
 
 function Player:checkCollisionDir(el, dir)
@@ -819,32 +1035,36 @@ function Player:canInteractWith(el)
     return min_dist_ok
 end
 
-function Player:keypressed(key, scene)
-    if self.is_dead then
-        return
-    end
+function Player:triggerAction(action, scene)
+    if self.is_dead then return end
 
     if self.is_hidden then
-        if (self.hide_cooldown or 0) > 0 then
-            return
-        end
-        if key == "e" or key == "space" or key == "up" or key == "w" or
-           key == "left" or key == "a" or key == "right" or key == "d" then
+        if (self.hide_cooldown or 0) > 0 then return end
+        if action == "interact" or action == "jump" or action == "up" or action == "down" or action == "left" or action == "right" then
             self.is_hidden = false
             return
         end
     end
 
-    if key == "space" or key == "up" or key == "w" then
+    if action == "jump" then
         self.jump_buffer_timer = self.jump_buffer_time
         if self.coyote_timer > 0 then
             self:jump()
-        elseif (self.is_wall_sliding or self.wall_coyote_timer > 0) and self:canWallJump(scene) then
-            self:wallJump()
-        end
-    end
+        elseif (self.is_wall_holding or self.is_wall_sliding or self.wall_coyote_timer > 0) and self:canWallJump(scene) then
+            local kick_w_dir = (self.wall_dir ~= 0 and self.wall_dir) or (self.last_wall_dir ~= 0 and self.last_wall_dir) or self.facing
+            local away_pressed = (kick_w_dir == -1 and Controls.isDown("right"))
+                              or (kick_w_dir == 1 and Controls.isDown("left"))
+            local hold_climb = Controls.isDown("climb")
 
-    if key == "e" then
+            if self.is_wall_holding and hold_climb and not away_pressed and self.stamina >= 10 then
+                self:climbJump(kick_w_dir)
+            else
+                self:wallJump(kick_w_dir)
+            end
+        end
+    elseif action == "dash" then
+        self:dash()
+    elseif action == "interact" then
         local target = (scene and scene.getInteractableElement and scene:getInteractableElement()) or (scene and scene.current_interactable)
         if not target and scene and scene.elements then
             for _, el in ipairs(scene.elements) do
@@ -862,6 +1082,28 @@ function Player:keypressed(key, scene)
                 target:onClick(1)
             end
         end
+    end
+end
+
+function Player:keypressed(key, scene)
+    if self.is_dead then
+        return
+    end
+
+    -- Check configured control actions
+    local matched_action = nil
+    for action, keys in pairs(Controls.keyboard) do
+        for _, k in ipairs(keys) do
+            if k == key then
+                matched_action = action
+                break
+            end
+        end
+        if matched_action then break end
+    end
+
+    if matched_action then
+        self:triggerAction(matched_action, scene)
     end
 end
 

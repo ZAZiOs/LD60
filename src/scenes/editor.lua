@@ -87,6 +87,11 @@ function EditorScene.new()
     self.pan_orig_cy = 0
 
     self.dragging_element = false
+    self.drag_candidate = false
+    self.drag_start_vx = 0
+    self.drag_start_vy = 0
+    self.drag_threshold = 4
+    self.click_hits = nil
     self.drag_ox = 0
     self.drag_oy = 0
 
@@ -372,6 +377,8 @@ function EditorScene:snap(val)
 end
 
 function EditorScene:selectElement(idx)
+    self.drag_candidate = false
+    self.dragging_element = false
     if idx and self.level_data and self.level_data.elements[idx] then
         self.selected_index = idx
         self.selected_element = self.level_data.elements[idx]
@@ -1584,7 +1591,6 @@ function EditorScene:mousepressed(vx, vy, button, istouch, presses)
         end
 
         -- Find all elements under the cursor (ordered from top to bottom)
-        local clicked_idx = nil
         local els = (self.level_data and self.level_data.elements) or {}
         local hits = {}
 
@@ -1603,7 +1609,10 @@ function EditorScene:mousepressed(vx, vy, button, istouch, presses)
             end
         end
 
-        if #hits > 0 then
+        if #hits == 0 then
+            self:selectElement(nil)
+            self.click_hits = nil
+        else
             -- Check if current selected element is one of the hits
             local current_hit_pos = nil
             for pos, idx in ipairs(hits) do
@@ -1614,31 +1623,23 @@ function EditorScene:mousepressed(vx, vy, button, istouch, presses)
             end
 
             if current_hit_pos then
-                -- Cycle to the next element behind it!
-                local next_pos = current_hit_pos + 1
-                if next_pos > #hits then
-                    next_pos = 1
-                end
-                clicked_idx = hits[next_pos]
-                if #hits > 1 then
-                    local target_el = els[clicked_idx]
-                    self:setStatus(string.format("Selected [%d/%d]: %s", next_pos, #hits, tostring(target_el and target_el.id or "")))
-                end
+                self.drag_candidate = true
+                self.dragging_element = false
+                self.drag_start_vx = vx
+                self.drag_start_vy = vy
+                self.click_hits = hits
+                self.drag_ox = wx - (self.selected_element.x or 0)
+                self.drag_oy = wy - (self.selected_element.y or 0)
             else
-                -- First click: pick the topmost element
-                clicked_idx = hits[1]
+                local top_idx = hits[1]
+                self:selectElement(top_idx)
+                self.click_hits = nil
+
                 if #hits > 1 then
-                    local target_el = els[clicked_idx]
+                    local target_el = els[top_idx]
                     self:setStatus(string.format("Selected [1/%d]: %s (click again to select behind)", #hits, tostring(target_el and target_el.id or "")))
                 end
             end
-        end
-
-        self:selectElement(clicked_idx)
-        if self.selected_element then
-            self.dragging_element = true
-            self.drag_ox = wx - (self.selected_element.x or 0)
-            self.drag_oy = wy - (self.selected_element.y or 0)
         end
     end
 end
@@ -1685,6 +1686,16 @@ function EditorScene:mousemoved(vx, vy, dx, dy, istouch)
             local wx, wy = self:screenToWorld(vx, vy)
             self.selected_element.x = self:snap(wx - self.drag_ox)
             self.selected_element.y = self:snap(wy - self.drag_oy)
+        elseif self.drag_candidate and self.selected_element then
+            local dist_sq = (vx - self.drag_start_vx) * (vx - self.drag_start_vx) + (vy - self.drag_start_vy) * (vy - self.drag_start_vy)
+            local threshold = self.drag_threshold or 4
+            if dist_sq >= threshold * threshold then
+                self.dragging_element = true
+                self.drag_candidate = false
+                local wx, wy = self:screenToWorld(vx, vy)
+                self.selected_element.x = self:snap(wx - self.drag_ox)
+                self.selected_element.y = self:snap(wy - self.drag_oy)
+            end
         end
     end
 end
@@ -1692,9 +1703,42 @@ end
 function EditorScene:mousereleased(vx, vy, button, istouch, presses)
     WindowManager.mousereleased(vx, vy, button)
     self.panning = false
-    self.dragging_element = false
-    self.dragging_collision = false
-    self.resizing_collision = false
+
+    if button == 1 then
+        if self.drag_candidate and self.click_hits and #self.click_hits > 0 then
+            -- Cursor did NOT move during click: cycle selection to object behind
+            local hits = self.click_hits
+            local els = (self.level_data and self.level_data.elements) or {}
+
+            local current_hit_pos = nil
+            for pos, idx in ipairs(hits) do
+                if idx == self.selected_index then
+                    current_hit_pos = pos
+                    break
+                end
+            end
+
+            if current_hit_pos then
+                local next_pos = current_hit_pos + 1
+                if next_pos > #hits then
+                    next_pos = 1
+                end
+                local next_idx = hits[next_pos]
+                self:selectElement(next_idx)
+
+                if #hits > 1 then
+                    local target_el = els[next_idx]
+                    self:setStatus(string.format("Selected [%d/%d]: %s", next_pos, #hits, tostring(target_el and target_el.id or "")))
+                end
+            end
+        end
+
+        self.dragging_element = false
+        self.drag_candidate = false
+        self.click_hits = nil
+        self.dragging_collision = false
+        self.resizing_collision = false
+    end
 end
 
 function EditorScene:wheelmoved(x, y)
