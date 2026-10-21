@@ -605,22 +605,13 @@ function Player:update(dt, scene)
                 self.vy = 0
                 self.stamina = math.max(0, self.stamina - 15 * dt)
             end
-        elseif can_slide_on_this_wall and hold_climb and self.stamina <= 0 then
-            -- Stamina ran out while holding Z: slide down automatically
-            is_climbing = true
-            self.is_wall_holding = true
-            self.is_wall_sliding = false
-            self.wall_dir = wall_contact_dir
-            self.last_wall_dir = wall_contact_dir
-            self.wall_coyote_timer = self.wall_coyote_time
-            self.facing = wall_contact_dir
-            self.vy = math.max(self.vy, self.climb_slide_speed)
         else
             self.is_wall_holding = false
         end
 
         if not is_climbing then
-            if can_slide_on_this_wall and self.vy > 0 and pressing_into_wall then
+            local should_slide = pressing_into_wall or (hold_climb and self.stamina <= 0)
+            if can_slide_on_this_wall and self.vy > 0 and should_slide then
                 self.is_wall_sliding = true
                 self.wall_dir = wall_contact_dir
                 self.last_wall_dir = wall_contact_dir
