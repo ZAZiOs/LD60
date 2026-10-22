@@ -120,7 +120,7 @@ function Player.new(opts)
     self.max_stamina = opts.max_stamina or 110
     self.stamina = self.max_stamina
     self.is_wall_holding = false
-    self.climb_up_speed = opts.climb_up_speed or 55
+    self.climb_up_speed = opts.climb_up_speed or 85
     self.climb_down_speed = opts.climb_down_speed or 85
     self.climb_slide_speed = opts.climb_slide_speed or 40
     self.climb_jump_force = opts.climb_jump_force or -255

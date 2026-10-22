@@ -1,15 +1,15 @@
 local Controls = {}
 
 local DEFAULT_KEYBOARD = {
-    left     = { "a", "left" },
-    right    = { "d", "right" },
-    up       = { "w", "up" },
-    down     = { "s", "down" },
+    left     = { "left" },
+    right    = { "right" },
+    up       = { "up" },
+    down     = { "down" },
 
-    jump     = { "space" },
-    dash     = { "lshift" },
-    climb    = { "f", "c" },
-    interact = { "e" }
+    climb    = { "lshift" },
+    dash     = { "x" },
+    jump     = { "z", "space" },
+    interact = { "c" }
 }
 
 local DEFAULT_GAMEPAD = {
